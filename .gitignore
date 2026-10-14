@@ -1,0 +1,134 @@
+﻿# ==============================================================================
+# .gitignore - Repositorio: ARQUITECTURA DEL SOFTWARE / Codigo
+# Reglas aplicadas de forma recursiva a todas las subcarpetas y proyectos
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Entornos Virtuales y Gestores de Paquetes
+# ------------------------------------------------------------------------------
+# Python (venv, virtualenv, conda)
+venv/
+.venv/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# Node.js / JavaScript / TypeScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.npm/
+
+# ------------------------------------------------------------------------------
+# 2. Cachés, Compilación y Archivos Generados
+# ------------------------------------------------------------------------------
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+
+# Testing y Cobertura (Python)
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+
+# Bundlers / Frameworks Web
+dist/
+build/
+out/
+.next/
+.nuxt/
+.astro/
+.cache/
+.parcel-cache/
+
+# Java / Maven / Gradle
+*.class
+target/
+.gradle/
+*.jar
+*.war
+
+# .NET / C# / C++
+bin/
+obj/
+*.suo
+*.user
+
+# ------------------------------------------------------------------------------
+# 3. Variables de Entorno, Credenciales y Secretos
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.env
+*.pem
+*.key
+*.cert
+credentials.json
+secrets.json
+
+# ------------------------------------------------------------------------------
+# 4. Bases de Datos Locales y Archivos Temporales
+# ------------------------------------------------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.bak
+*.tmp
+*.temp
+
+# ------------------------------------------------------------------------------
+# 5. Configuraciones de Editores e IDEs
+# ------------------------------------------------------------------------------
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+
+# Visual Studio
+.vs/
+
+# Otros editores
+*.swp
+*~
+
+# ------------------------------------------------------------------------------
+# 6. Archivos del Sistema Operativo
+# ------------------------------------------------------------------------------
+# Windows
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
