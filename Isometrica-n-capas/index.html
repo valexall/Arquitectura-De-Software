@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Torre Isométrica 3D — Arquitectura en N-Capas | UNAMBA</title>
+  <meta name="description" content="Visualizador Isométrico 3D Interactivo del Flujo de Peticiones y Respuestas en una Arquitectura de Software en N-Capas (UNAMBA - AIS-86)." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="top-nav">
+    <div class="brand">
+      <div class="logo-mark">
+        <span class="cube-icon">⬢</span>
+      </div>
+      <div class="brand-text">
+        <h1 class="main-title">Torre Isométrica 3D <span class="tag">N-Capas</span></h1>
+        <p class="sub-title">UNAMBA · Escuela Profesional de Ingeniería Informática y Sistemas · AIS-86</p>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button id="btn-scenarios-modal" class="btn btn-secondary" title="Seleccionar Tipo de Escenario 3D">
+        <span class="icon">🎨</span>
+        <span>Escenarios 3D</span>
+      </button>
+
+      <button id="btn-guide-modal" class="btn btn-primary" title="Guía de Arquitectura y Mapeo al Código">
+        <span class="icon">📖</span>
+        <span>Guía & Código</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Left HUD: Flow Simulation Controller -->
+  <aside class="hud-panel hud-left">
+    <div class="panel-header">
+      <div class="header-indicator pulse-green"></div>
+      <h2>Simulación del Flujo</h2>
+    </div>
+
+    <!-- Scenario / Endpoint Selector -->
+    <div class="control-group">
+      <label for="sim-select" class="control-label">Flujo de Petición HTTP:</label>
+      <div class="select-wrapper">
+        <select id="sim-select" class="custom-select">
+          <option value="GET_QUERY">GET /api/reservas (Lectura 200 OK)</option>
+          <option value="POST_SUCCESS">POST /api/reservas (Creación Exitosa 201)</option>
+          <option value="POST_REJECTED">POST /api/reservas (Rechazo Negocio 400 - Sin Cupo)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Playback Controls -->
+    <div class="playback-bar">
+      <button id="btn-play" class="btn-icon btn-action" title="Iniciar Reproducción">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button id="btn-pause" class="btn-icon btn-action" title="Pausar" style="display:none;">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+      <button id="btn-reset" class="btn-icon btn-secondary-icon" title="Reiniciar al Inicio">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+      </button>
+
+      <div class="speed-toggle">
+        <button class="speed-btn" data-speed="0.5">0.5x</button>
+        <button class="speed-btn active" data-speed="1.0">1x</button>
+        <button class="speed-btn" data-speed="2.0">2x</button>
+      </div>
+    </div>
+
+    <!-- Timeline Scrubber -->
+    <div class="timeline-box">
+      <input type="range" id="timeline-slider" min="0" max="100" value="0" step="0.1" class="custom-range" />
+      <div class="timeline-meta">
+        <span class="timeline-label">Trayectoria Física 3D</span>
+        <span id="step-badge" class="step-badge">Paso 1 de 9</span>
+      </div>
+    </div>
+
+    <!-- Live Telemetry Card -->
+    <div class="telemetry-card">
+      <div class="telemetry-header">
+        <span class="live-dot"></span>
+        <span id="step-title" class="telemetry-title">Listo para simular</span>
+      </div>
+      <p id="step-detail" class="telemetry-detail">Presiona reproducir para observar la trayectoria del paquete a través de las 5 capas de la arquitectura.</p>
+      <div class="code-log-box">
+        <span class="log-prefix">&gt;</span>
+        <code id="step-log">Esperando orden de despacho...</code>
+      </div>
+    </div>
+
+    <!-- Layer Quick Selector Pills -->
+    <div class="layer-nav-box">
+      <span class="section-label">Capas del Sistema:</span>
+      <div class="layer-nav-list">
+        <button class="layer-nav-item" data-layer="client">
+          <span class="dot" style="background:#38bdf8"></span>
+          <span>Capa 0: Clientes</span>
+        </button>
+        <button class="layer-nav-item" data-layer="presentation">
+          <span class="dot" style="background:#818cf8"></span>
+          <span>Capa 1: Presentación</span>
+        </button>
+        <button class="layer-nav-item active" data-layer="business">
+          <span class="dot" style="background:#f59e0b"></span>
+          <span>Capa 2: Negocio</span>
+        </button>
+        <button class="layer-nav-item" data-layer="repository">
+          <span class="dot" style="background:#10b981"></span>
+          <span>Capa 3: Repositorios</span>
+        </button>
+        <button class="layer-nav-item" data-layer="database">
+          <span class="dot" style="background:#ec4899"></span>
+          <span>Capa 4: Base de Datos</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right HUD: Layer Inspector Drawer -->
+  <aside class="hud-panel hud-right" id="layer-inspector">
+    <div class="panel-header">
+      <div class="header-indicator pulse-amber"></div>
+      <h2>Inspector Arquitectónico</h2>
+    </div>
+
+    <div class="inspector-body">
+      <div class="layer-hero">
+        <h3 id="inspector-title" class="inspector-title">Capa 2: Lógica de Negocio & Servicios</h3>
+        <p id="inspector-role" class="inspector-role">Núcleo del Dominio y Validación de Reglas de Negocio</p>
+      </div>
+
+      <!-- Code Mapping Link -->
+      <div class="inspector-section">
+        <span class="section-label">Archivo en el Proyecto:</span>
+        <div class="codepath-box">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+          <code id="inspector-codepath">ais86-semana05-mvc-refactor/servicio/reservas.py</code>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="inspector-section">
+        <span class="section-label">Descripción de Responsabilidad:</span>
+        <p id="inspector-desc" class="inspector-desc">El cerebro de la aplicación. Aplica las políticas, cálculos, validaciones de dominio y flujos de trabajo.</p>
+      </div>
+
+      <!-- Architectural Golden Rules -->
+      <div class="inspector-section">
+        <span class="section-label">Reglas de Oro Arquitectónicas:</span>
+        <ul id="inspector-rules" class="inspector-rules-list">
+          <li>Independiente de la tecnología web (no sabe qué es HTTP ni Flask).</li>
+          <li>Si una regla falla, dispara una excepción de negocio y detiene el flujo.</li>
+        </ul>
+      </div>
+
+      <!-- Physical Components in 3D -->
+      <div class="inspector-section">
+        <span class="section-label">Componentes de Implementación:</span>
+        <div id="inspector-tech" class="tech-tags">Servicios de Dominio / Casos de Uso / Validadores / Reglas</div>
+      </div>
+
+      <div class="inspector-actions">
+        <button id="btn-focus-layer" class="btn btn-outline" title="Centrar cámara en esta capa">
+          <span>🎯 Enfocar en 3D</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Floating Dock -->
+  <footer class="bottom-dock">
+    <!-- Camera View Presets -->
+    <div class="dock-section">
+      <span class="dock-title">Cámara 3D:</span>
+      <div class="button-group">
+        <button id="cam-iso-front" class="btn-dock active" title="Isométrica Frontal">
+          <span>📐 Frontal</span>
+        </button>
+        <button id="cam-iso-top" class="btn-dock" title="Isométrica Superior">
+          <span>⬆️ Superior</span>
+        </button>
+        <button id="cam-side" class="btn-dock" title="Perfil Lateral">
+          <span>↔️ Lateral</span>
+        </button>
+        <button id="cam-reset" class="btn-dock" title="Restablecer Posición">
+          <span>🔄 Reset</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Exploded View Slider -->
+    <div class="dock-section exploded-control">
+      <div class="dock-header-row">
+        <span class="dock-title">Vista Explosionada:</span>
+        <span id="exploded-val" class="dock-badge">0%</span>
+      </div>
+      <input type="range" id="slider-exploded" min="0" max="100" value="0" class="custom-range" title="Separar capas verticalmente" />
+    </div>
+
+    <!-- Quick Scenario Switcher -->
+    <div class="dock-section">
+      <span class="dock-title">Escenario Visual:</span>
+      <div class="quick-themes">
+        <button class="quick-theme-btn active" data-theme="cyber" title="Cyber-Grid Quantum (Sci-Fi)">⚡ Cyber</button>
+        <button class="quick-theme-btn" data-theme="glass" title="Minimal Clean Studio (Glassmorphism)">💎 Glass</button>
+        <button class="quick-theme-btn" data-theme="industrial" title="Industrial Data Plant (Mecatrónica)">🏭 Industrial</button>
+        <button class="quick-theme-btn" data-theme="blueprint" title="Holographic Blueprint (Técnico)">📐 Blueprint</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal: Opciones de Escenario (Tipo de Escenario) -->
+  <div id="scenarios-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-header-text">
+          <h2 class="modal-title">Opciones de Escenario 3D</h2>
+          <p class="modal-sub">Elige el estilo visual, metáfora y ambientación espacial para la torre isométrica:</p>
+        </div>
+        <button class="modal-close" title="Cerrar modal">&times;</button>
+      </div>
+
+      <div class="scenarios-grid">
+        <!-- Scenario 1: Cyber-Grid -->
+        <div class="scenario-card selected" data-theme="cyber">
+          <div class="card-badge">Sci-Fi & Cloud</div>
+          <div class="card-preview cyber-preview">
+            <div class="preview-glow"></div>
+            <div class="preview-tower">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="card-content">
+            <h3 class="scenario-name">1. Cyber-Grid Quantum</h3>
+            <p class="scenario-desc">Estética de ciberespacio oscuro con plataformas de obsidiana translúcida, rejilla de neón cian/magenta infinita, tuberías de fotones y núcleos de luz cuántica.</p>
+            <div class="scenario-tags">
+              <span class="tag-pill">Neón Cian</span>
+              <span class="tag-pill">Obsidiana</span>
+              <span class="tag-pill">Microservicios</span>
+            </div>
+          </div>
+          <button class="btn-select-scenario">Activar Escenario</button>
+        </div>
+
+        <!-- Scenario 2: Minimalist Clean Glass -->
+        <div class="scenario-card" data-theme="glass">
+          <div class="card-badge">Estudio & Apple</div>
+          <div class="card-preview glass-preview">
+            <div class="preview-glow"></div>
+            <div class="preview-tower">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="card-content">
+            <h3 class="scenario-name">2. Minimal Clean Studio</h3>
+            <p class="scenario-desc">Losas de vidrio esmerilado de alta transmisión con biseles físicos, titanio satinado, columnas cromadas de laboratorio e iluminación suave de estudio de diseño.</p>
+            <div class="scenario-tags">
+              <span class="tag-pill">Glassmorphism</span>
+              <span class="tag-pill">Titanio</span>
+              <span class="tag-pill">Corporativo</span>
+            </div>
+          </div>
+          <button class="btn-select-scenario">Activar Escenario</button>
+        </div>
+
+        <!-- Scenario 3: Industrial Data Plant -->
+        <div class="scenario-card" data-theme="industrial">
+          <div class="card-badge">Mecatrónica & Metal</div>
+          <div class="card-preview industrial-preview">
+            <div class="preview-glow"></div>
+            <div class="preview-tower">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="card-content">
+            <h3 class="scenario-name">3. Industrial Data Plant</h3>
+            <p class="scenario-desc">Complejo de centro de datos industrial pesado: hierro fundido, latón bruñido, cilindros neumáticos con pistones de validación, franjas de peligro y luces ámbar de advertencia.</p>
+            <div class="scenario-tags">
+              <span class="tag-pill">Hierro Fundido</span>
+              <span class="tag-pill">Pistones</span>
+              <span class="tag-pill">Alta Resiliencia</span>
+            </div>
+          </div>
+          <button class="btn-select-scenario">Activar Escenario</button>
+        </div>
+
+        <!-- Scenario 4: Holographic CAD Blueprint -->
+        <div class="scenario-card" data-theme="blueprint">
+          <div class="card-badge">Ingeniería & CAD</div>
+          <div class="card-preview blueprint-preview">
+            <div class="preview-glow"></div>
+            <div class="preview-tower">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="card-content">
+            <h3 class="scenario-name">4. Holographic CAD Blueprint</h3>
+            <p class="scenario-desc">Visualización holográfica en alambre y mallas técnicas sobre cuadrícula milimétrica azul cobalto, simulando una auditoría arquitectónica de software en un escáner 3D.</p>
+            <div class="scenario-tags">
+              <span class="tag-pill">Malla Wireframe</span>
+              <span class="tag-pill">Azul Cobalto</span>
+              <span class="tag-pill">Auditoría Formal</span>
+            </div>
+          </div>
+          <button class="btn-select-scenario">Activar Escenario</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Guía Arquitectónica y Mapeo al Código -->
+  <div id="guide-modal" class="modal-backdrop">
+    <div class="modal-card guide-modal-card">
+      <div class="modal-header">
+        <div class="modal-header-text">
+          <h2 class="modal-title">Guía de Arquitectura en N-Capas</h2>
+          <p class="modal-sub">Principios de Desacoplamiento, Responsabilidad Única y Correspondencia con el Proyecto UNAMBA</p>
+        </div>
+        <button class="modal-close" title="Cerrar modal">&times;</button>
+      </div>
+
+      <div class="guide-content">
+        <section class="guide-section">
+          <h3>1. Jerarquía Estricta del Flujo de Información</h3>
+          <p>En una arquitectura de N capas pura, la comunicación fluye **estrictamente de arriba hacia abajo para peticiones** y **de abajo hacia arriba para respuestas**. Ninguna capa puede saltarse a su vecina inmediata:</p>
+
+          <div class="layers-flow-diagram">
+            <div class="diagram-step">
+              <span class="badge-blue">Capa 0: Clientes</span>
+              <p>Navegador, Postman, App Móvil. Emite JSON o formularios HTTP.</p>
+            </div>
+            <div class="diagram-arrow">⬇ Petición HTTP / ⬆ Respuesta JSON</div>
+            <div class="diagram-step">
+              <span class="badge-indigo">Capa 1: Presentación (Controlador)</span>
+              <p>Enrutamiento, deserialización y validación sintáctica. <em>(rutas.py)</em></p>
+            </div>
+            <div class="diagram-arrow">⬇ Llamada de Caso de Uso / ⬆ Entidades de Dominio</div>
+            <div class="diagram-step">
+              <span class="badge-amber">Capa 2: Negocio (Servicios)</span>
+              <p>Reglas de negocio, cálculos y validaciones. Si falla cupo ➔ Rechaza aquí sin tocar BD. <em>(reservas.py)</em></p>
+            </div>
+            <div class="diagram-arrow">⬇ Operación de Persistencia / ⬆ Registros Mapeados</div>
+            <div class="diagram-step">
+              <span class="badge-green">Capa 3: Repositorio (DAL)</span>
+              <p>Abstracción de almacenamiento (Data Mapper). Aísla la BD del negocio. <em>(memoria.py)</em></p>
+            </div>
+            <div class="diagram-arrow">⬇ I/O de Bloques Físicos / ⬆ Tuplas Crudas</div>
+            <div class="diagram-step">
+              <span class="badge-pink">Capa 4: Base de Datos & Persistencia</span>
+              <p>Platos magnéticos, índices B-Tree, memoria y log WAL. <em>(entidad.py / DB)</em></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <h3>2. Las Tres Reglas de Oro de la Arquitectura</h3>
+          <div class="rules-grid">
+            <div class="rule-box">
+              <h4>🚫 Prohibición de Saltos</h4>
+              <p>El Controlador **NUNCA** debe saltarse el Servicio para llamar directamente al Repositorio o ejecutar SQL. Saltarse capas rompe la encapsulación de las reglas de negocio.</p>
+            </div>
+            <div class="rule-box">
+              <h4>🛡️ Aislamiento del Dominio</h4>
+              <p>La Capa de Negocio **NO DEBE** importar librerías web (como <code>flask</code>, <code>request</code>, <code>jsonify</code>). Debe poder probarse en segundos con tests unitarios puros.</p>
+            </div>
+            <div class="rule-box">
+              <h4>🔄 Intercambiabilidad de Persistencia</h4>
+              <p>El patrón Repositorio garantiza que podemos migrar de memoria volátil a PostgreSQL o MongoDB **sin cambiar ni una sola línea de la lógica de negocio**.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <h3>3. Demostración Visual del Rechazo de Regla (Error 400)</h3>
+          <p>Prueba en la simulación el caso <strong>"POST /api/reservas (Rechazo Negocio 400 - Sin Cupo)"</strong>:</p>
+          <p>Observarás cómo el paquete llega al núcleo de negocio en la Capa 2, la balanza detecta que los cupos solicitados superan el cupo disponible, y el paquete es expulsado por la **rampa lateral roja de excepción**, retornando 400 Bad Request directamente hacia arriba. <strong>¡El Repositorio y la Base de Datos permanecen 100% inmóviles e intactos!</strong></p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load Three.js App via ESM -->
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

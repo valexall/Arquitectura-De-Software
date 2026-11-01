@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arquitectura de N capas: el viaje de una petición</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e4eaf3; --scene-1:#f3f6fb; --scene-2:#d3dcea;
+  --ink:#232d47; --ink-2:#56627f; --surface:#ffffff; --pill:rgba(255,255,255,.9);
+  --belt:#f8faff; --belt-side:#b5c1d6; --belt-dash:#c6d0e3; --tunnel:#262f49;
+  --line:rgba(35,45,71,.14); --accent:#5b8def;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121722; --scene-1:#222b3f; --scene-2:#161c2b;
+    --ink:#e9eefb; --ink-2:#9ba8c4; --surface:#1d2536; --pill:rgba(28,36,54,.92);
+    --belt:#3b4663; --belt-side:#232b40; --belt-dash:#5a6683; --tunnel:#0b0f19;
+    --line:rgba(233,238,251,.16); --accent:#8fb1ff;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121722; --scene-1:#222b3f; --scene-2:#161c2b;
+  --ink:#e9eefb; --ink-2:#9ba8c4; --surface:#1d2536; --pill:rgba(28,36,54,.92);
+  --belt:#3b4663; --belt-side:#232b40; --belt-dash:#5a6683; --tunnel:#0b0f19;
+  --line:rgba(233,238,251,.16); --accent:#8fb1ff;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.5}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 18px 40px}
+h1{font-size:clamp(26px,4.2vw,40px);font-weight:900;letter-spacing:-.02em;margin:0 0 6px;line-height:1.1}
+.lead{margin:0 0 20px;color:var(--ink-2);max-width:68ch;font-weight:600}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.btn{font:inherit;font-weight:800;font-size:14px;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:999px;padding:9px 16px;cursor:pointer;display:inline-flex;gap:8px;align-items:center;transition:transform .15s,border-color .15s}
+.btn:hover{transform:translateY(-2px);border-color:var(--c,var(--accent))}
+.btn:focus-visible,.station:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.btn i{width:11px;height:11px;border-radius:50%;background:var(--c,var(--accent));display:inline-block}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.primary i{background:var(--bg)}
+.sp{flex:1}
+.ctl{display:flex;gap:8px;align-items:center;font-weight:700;font-size:14px;color:var(--ink-2)}
+.ctl input[type=range]{accent-color:var(--accent);width:110px}
+.scene{border-radius:30px;background:radial-gradient(ellipse at 50% 38%,var(--scene-1),var(--scene-2));border:2px solid var(--line);overflow:hidden}
+svg{display:block;width:100%;height:auto}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:2px solid var(--line);border-radius:22px;padding:18px 20px;min-height:200px}
+.panel h2{margin:0 0 4px;font-size:19px;font-weight:900}
+.tier{display:inline-block;font-size:12.5px;font-weight:800;padding:2px 10px;border-radius:999px;color:#1f2a44;margin-bottom:8px}
+.panel p{margin:6px 0;color:var(--ink-2);font-weight:600}
+.panel .tech{font-weight:800;color:var(--ink);font-size:14px}
+pre{margin:10px 0 0;background:var(--tunnel);color:#d8e3ff;border-radius:14px;padding:12px 14px;font-size:12.5px;overflow-x:auto;line-height:1.55}
+.logh{font-size:15px;font-weight:900;margin:0 0 10px}
+#log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+#log li{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;font-weight:700;color:var(--ink-2);animation:in .35s ease}
+#log li:first-child{color:var(--ink)}
+#log li i{flex:none;width:10px;height:10px;border-radius:50%;margin-top:6px}
+@keyframes in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* escena */
+.pill{fill:var(--pill);stroke:var(--line);stroke-width:1.5}
+.label{cursor:pointer}
+.label .t1{font-size:11.5px;font-weight:900;fill:var(--ink)}
+.label .t2{font-size:10px;font-weight:700;fill:var(--ink-2)}
+.station{cursor:pointer;transition:filter .3s}
+.station.active{filter:brightness(1.1) drop-shadow(0 0 12px var(--glow))}
+.station.selected{filter:drop-shadow(0 0 2px var(--ink)) drop-shadow(0 0 2px var(--ink))}
+.station.selected.active{filter:brightness(1.1) drop-shadow(0 0 12px var(--glow)) drop-shadow(0 0 2px var(--ink))}
+.icon{transform-box:fill-box;transform-origin:50% 100%}
+.station.active .icon{animation:pop .7s ease}
+@keyframes pop{40%{transform:translateY(-7px) scale(1.1)}}
+.dash{fill:none;stroke:var(--belt-dash);stroke-width:2.4;stroke-linecap:round;stroke-dasharray:3 13;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-16}}
+.spin{transform-box:fill-box;transform-origin:center;animation:spin 7s linear infinite}
+.spin.rev{animation-direction:reverse;animation-duration:5s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bob{animation:bob 2.2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px)}}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(1.12)}}
+.puff{transform-box:fill-box;transform-origin:center;animation:puff 2.8s ease-out infinite;opacity:0}
+.puff:nth-child(2){animation-delay:.9s}.puff:nth-child(3){animation-delay:1.8s}
+@keyframes puff{0%{opacity:.7;transform:translateY(0) scale(.6)}100%{opacity:0;transform:translateY(-34px) scale(1.7)}}
+@media (prefers-reduced-motion: reduce){
+  .dash,.spin,.bob,.pulse,.puff,#log li,.station.active .icon{animation:none}
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>El viaje de una petición por las N capas</h1>
+  <p class="lead">Cada paquete es una petición HTTP. Baja capa por capa hasta los datos y regresa convertida en respuesta. Toca cualquier estación para ver qué hace.</p>
+
+  <div class="controls">
+    <button class="btn primary" data-route="random" type="button"><i></i>Enviar petición</button>
+    <button class="btn" data-route="db" style="--c:#6aa8ff" type="button"><i></i>Consulta a la BD</button>
+    <button class="btn" data-route="cache" style="--c:#ffb347" type="button"><i></i>Acierto de caché</button>
+    <button class="btn" data-route="err" style="--c:#ff7d89" type="button"><i></i>Petición inválida</button>
+    <span class="sp"></span>
+    <label class="ctl"><input id="auto" type="checkbox" checked> Automático</label>
+    <label class="ctl">Velocidad <input id="speed" type="range" min="0.5" max="2.5" step="0.1" value="1"></label>
+  </div>
+
+  <section class="scene">
+    <svg id="svg" viewBox="0 0 860 620" role="img" aria-label="Escena isométrica con una cinta transportadora que atraviesa las capas de presentación, negocio, acceso a datos y datos">
+      <defs>
+        <linearGradient id="scr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8dc0ff"/><stop offset="1" stop-color="#c6a8ff"/></linearGradient>
+      </defs>
+      <g id="belt"></g>
+      <g id="stations"></g>
+      <g id="labels"></g>
+      <g id="packets"></g>
+    </svg>
+  </section>
+
+  <section class="grid">
+    <article class="panel" id="info" aria-live="polite"></article>
+    <aside class="panel">
+      <h2 class="logh">Lo que está pasando</h2>
+      <ul id="log"></ul>
+    </aside>
+  </section>
+</main>
+
+<script>
+(()=>{
+const NS='http://www.w3.org/2000/svg';
+const W=40,H=20,OX=190,OY=110,BELT=0.45;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- proyección isométrica ---------- */
+const iso=(x,y,z=0)=>[OX+(x-y)*W, OY+(x+y)*H-z];
+const fmt=a=>a[0].toFixed(1)+','+a[1].toFixed(1);
+const poly=(pts,attr)=>`<polygon points="${pts.map(p=>fmt(iso(p[0],p[1],p[2]||0))).join(' ')}" ${attr}/>`;
+function mix(hex,t){
+  const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;
+  const f=t>=0?255:0,a=Math.abs(t);
+  r=Math.round(r+(f-r)*a);g=Math.round(g+(f-g)*a);b=Math.round(b+(f-b)*a);
+  return `rgb(${r},${g},${b})`;
+}
+const soft=(pts,fill)=>poly(pts,`fill="${fill}" stroke="${fill}" stroke-width="4" stroke-linejoin="round"`);
+
+/* ---------- cinta: nodos, tramos y rutas ---------- */
+const N={A:[0,0],B:[5,0],C:[5,4],D:[10,4],E:[10,10],F:[10,0],G:[15,4]};
+const SEGS=[['A','B','trunk'],['B','C','trunk'],['C','D','trunk'],['D','F','a'],['D','E','b'],['D','G','c']];
+const EDGE={trunk:'#a8c1f2',a:'#ffb88a',b:'#7fb4ff',c:'#ff8e9a'};
+const ROUTES={db:{nodes:['A','B','C','D','E'],color:'#6aa8ff'},cache:{nodes:['A','B','C','D','F'],color:'#ffb347'},err:{nodes:['A','B','C','D','G'],color:'#ff7d89'}};
+Object.values(ROUTES).forEach(R=>{
+  R.pts=R.nodes.map(k=>N[k]);R.cum=[0];
+  for(let i=1;i<R.pts.length;i++){const a=R.pts[i-1],b=R.pts[i];R.cum.push(R.cum[i-1]+Math.abs(b[0]-a[0])+Math.abs(b[1]-a[1]));}
+  R.len=R.cum[R.cum.length-1];
+});
+function at(R,s){
+  for(let i=1;i<R.pts.length;i++){
+    if(s<=R.cum[i]||i===R.pts.length-1){
+      const a=R.pts[i-1],b=R.pts[i],t=(s-R.cum[i-1])/(R.cum[i]-R.cum[i-1]);
+      return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
+    }
+  }
+}
+function beltSVG(){
+  let walls='',tops='',edges='',dashes='',badges='';
+  SEGS.forEach(([a,b,k])=>{
+    const [ax,ay]=N[a],[bx,by]=N[b],horiz=ay===by;
+    const xmin=horiz?Math.min(ax,bx)-BELT:ax-BELT, xmax=horiz?Math.max(ax,bx)+BELT:ax+BELT;
+    const ymin=horiz?ay-BELT:Math.min(ay,by)-BELT, ymax=horiz?ay+BELT:Math.max(ay,by)+BELT;
+    tops+=poly([[xmin,ymin],[xmax,ymin],[xmax,ymax],[xmin,ymax]],'fill="var(--belt)" stroke="var(--belt)" stroke-width="2" stroke-linejoin="round"');
+    if(horiz) walls+=poly([[xmin,ymax,0],[xmax,ymax,0],[xmax,ymax,-9],[xmin,ymax,-9]],'fill="var(--belt-side)"');
+    else walls+=poly([[xmax,ymin,0],[xmax,ymax,0],[xmax,ymax,-9],[xmax,ymin,-9]],'fill="var(--belt-side)" style="filter:brightness(.88)"');
+    const c=EDGE[k], line=(p,q)=>`<line x1="${iso(...p)[0].toFixed(1)}" y1="${iso(...p)[1].toFixed(1)}" x2="${iso(...q)[0].toFixed(1)}" y2="${iso(...q)[1].toFixed(1)}" stroke="${c}" stroke-width="3" stroke-linecap="round"/>`;
+    if(horiz){edges+=line([xmin,ymin,0],[xmax,ymin,0])+line([xmin,ymax,0],[xmax,ymax,0]);}
+    else{edges+=line([xmin,ymin,0],[xmin,ymax,0])+line([xmax,ymin,0],[xmax,ymax,0]);}
+    const p1=iso(ax,ay),p2=iso(bx,by);
+    dashes+=`<path class="dash" d="M${fmt(p1)} L${fmt(p2)}"/>`;
+  });
+  [['A',10,2,'#ffb347'],['B',10,5.5,'#6aa8ff'],['C',12.5,4,'#ff7d89']].forEach(([l,x,y,c])=>{
+    const [sx,sy]=iso(x,y,14);
+    badges+=`<g transform="translate(${sx.toFixed(1)},${sy.toFixed(1)})"><circle r="11" fill="${c}" stroke="#fff" stroke-width="2.5"/><text y="4.5" text-anchor="middle" font-size="13" font-weight="900" fill="#1f2a44">${l}</text></g>`;
+  });
+  return walls+tops+edges+dashes+badges;
+}
+
+/* ---------- iconos ---------- */
+function gear(r,t){
+  const ro=r,ri=r*.78,per=2*Math.PI/t;let d='';
+  for(let i=0;i<t;i++){const a=i*per;
+    [[ri,a-per*.30],[ro,a-per*.16],[ro,a+per*.16],[ri,a+per*.30]].forEach((q,j)=>{d+=(i===0&&j===0?'M':'L')+(Math.cos(q[1])*q[0]).toFixed(1)+','+(Math.sin(q[1])*q[0]).toFixed(1)+' ';});
+  }
+  return d+'Z';
+}
+const ICONS={
+  monitor:`<rect x="-27" y="-46" width="54" height="36" rx="7" fill="#2b3552"/><rect x="-23" y="-42" width="46" height="28" rx="4" fill="url(#scr)"/><rect x="-17" y="-37" width="22" height="4" rx="2" fill="#fff" opacity=".85"/><rect x="-17" y="-29" width="30" height="3" rx="1.5" fill="#fff" opacity=".6"/><rect x="-17" y="-23" width="18" height="3" rx="1.5" fill="#fff" opacity=".6"/><rect x="-6" y="-10" width="12" height="6" fill="#2b3552"/><rect x="-15" y="-5" width="30" height="5" rx="2.5" fill="#2b3552"/>`,
+  api:`<path d="M-14,-52 a20,20 0 0 1 28,0" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".9"/><path d="M-8,-45 a11,11 0 0 1 16,0" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="-32" y="-38" width="64" height="28" rx="9" fill="#fff"/><text y="-19" text-anchor="middle" font-size="13" font-weight="900" fill="#2f7fd0">REST API</text><rect x="-4" y="-10" width="8" height="8" fill="#fff"/>`,
+  gears:`<g transform="translate(-12,-30)"><path class="spin" d="${gear(19,10)}" fill="#fff" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><circle r="6" fill="#58b99a"/></g><g transform="translate(17,-18)"><path class="spin rev" d="${gear(12,7)}" fill="#eafff6" stroke="#eafff6" stroke-width="2" stroke-linejoin="round"/><circle r="4" fill="#58b99a"/></g>`,
+  gate:`<g class="bob"><circle cy="-42" r="18" fill="#fff6c4" stroke="#e5b93a" stroke-width="3.5"/><text y="-34" text-anchor="middle" font-size="24" font-weight="900" fill="#c98a0b">?</text></g>`,
+  folder:`<path d="M-28,-10 v-30 a4,4 0 0 1 4,-4 h16 l5,6 h27 a4,4 0 0 1 4,4 v24 a4,4 0 0 1 -4,4 z" fill="#fff4cf"/><rect x="-28" y="-34" width="56" height="24" rx="5" fill="#ffd05a"/><text y="-17" text-anchor="middle" font-size="12" font-weight="900" fill="#8a5a00">CRUD</text>`,
+  bolt:`<g class="pulse"><path d="M8,-58 L-14,-28 L-2,-28 L-9,-4 L16,-38 L3,-38 L12,-58 Z" fill="#ffd45a" stroke="#e07b00" stroke-width="3" stroke-linejoin="round"/></g>`,
+  warn:`<path d="M0,-56 L-22,-16 L22,-16 Z" fill="#ffd24a" stroke="#e0a000" stroke-width="4" stroke-linejoin="round"/><text y="-23" text-anchor="middle" font-size="22" font-weight="900" fill="#7a4b00">!</text><g fill="#fff"><circle class="puff" cx="-4" cy="-62" r="7"/><circle class="puff" cx="6" cy="-62" r="6"/><circle class="puff" cx="0" cy="-62" r="8"/></g>`
+};
+
+/* ---------- estaciones ---------- */
+const ST=[
+ {id:'client',cx:0,cy:0,w:1.6,d:1.6,h:36,color:'#c7b6f2',icon:'monitor',tR:1,iv:{all:[0,.9]},
+  name:'Cliente',sub:'Navegador o app móvil',lab:{dx:-72,dy:-6,a:'end'}},
+ {id:'pres',cx:2.8,cy:0,w:1.6,d:1.6,h:44,color:'#9fd0f5',icon:'api',tR:1,iv:{all:[2,3.6]},
+  name:'Capa de presentación',sub:'Controllers, API REST',lab:{dx:-62,dy:-30,a:'end'}},
+ {id:'neg',cx:5,cy:2,w:1.6,d:1.6,h:48,color:'#a8e6cf',icon:'gears',tL:1,iv:{all:[6.2,7.8]},
+  name:'Capa de negocio',sub:'Servicios, casos de uso',lab:{dx:-74,dy:-18,a:'end'}},
+ {id:'cache',cx:10,cy:0,w:1.6,d:1.6,h:44,color:'#ffc9a6',icon:'bolt',tL:1,iv:{cache:[17.2,18]},
+  name:'Caché',sub:'Redis, memoria',lab:{dx:74,dy:4,a:'start'}},
+ {id:'gate',cx:10,cy:4,w:1.6,d:1.6,h:54,color:'#e6c8f0',icon:'gate',tR:1,tL:1,iv:{all:[13.2,14.8]},
+  name:'Reglas de negocio',sub:'¿Caché? ¿BD? ¿Inválida?',lab:{dx:0,dy:98,a:'middle'}},
+ {id:'repo',cx:10,cy:7,w:1.6,d:1.6,h:44,color:'#ffe08a',icon:'folder',tL:1,iv:{db:[16.2,17.8]},
+  name:'Capa de acceso a datos',sub:'Repositorios, ORM',lab:{dx:-76,dy:-8,a:'end'}},
+ {id:'err',cx:15,cy:4,w:1.6,d:1.6,h:44,color:'#ff9fa8',icon:'warn',iv:{err:[18.2,19]},
+  name:'Petición rechazada',sub:'400, 401, 422',lab:{dx:0,dy:62,a:'middle'}},
+ {id:'db',cx:10,cy:10,shape:'cyl',r:.9,h:62,color:'#8fb8f0',iv:{db:[19.1,20]},
+  name:'Capa de datos',sub:'Base de datos',lab:{dx:0,dy:64,a:'middle'}}
+];
+const byId=Object.fromEntries(ST.map(s=>[s.id,s]));
+
+function stationSVG(st){
+  const {cx,cy,color}=st;
+  if(st.shape==='cyl'){
+    const [bx,by]=iso(cx,cy,0),rx=st.r*Math.SQRT2*W,ry=st.r*Math.SQRT2*H;
+    let s=`<ellipse cx="${bx}" cy="${by+6}" rx="${rx+8}" ry="${ry+5}" fill="rgba(20,30,60,.13)"/>`;
+    const discH=17,gap=4;
+    for(let k=0;k<3;k++){
+      const base=by-k*(discH+gap), side=mix(color,-.1), top=mix(color,.28);
+      s+=`<path d="M${bx-rx},${base} v${-discH} h${2*rx} v${discH} a${rx},${ry} 0 0 1 ${-2*rx},0 z" fill="${side}" stroke="${side}" stroke-width="2" stroke-linejoin="round"/>`;
+      s+=`<ellipse cx="${bx}" cy="${base-discH}" rx="${rx}" ry="${ry}" fill="${top}"/>`;
+      s+=`<circle cx="${bx-rx*.55}" cy="${base-discH/2+ry*.55}" r="2.4" fill="#fff" opacity=".9"/><circle cx="${bx-rx*.35}" cy="${base-discH/2+ry*.7}" r="2.4" fill="#ff9fb5"/>`;
+    }
+    return s;
+  }
+  const x0=cx-st.w/2,x1=cx+st.w/2,y0=cy-st.d/2,y1=cy+st.d/2,h=st.h;
+  let s=poly([[x0,y0,-2],[x1+.35,y0,-2],[x1+.35,y1+.35,-2],[x0,y1+.35,-2]],'fill="rgba(20,30,60,.13)"');
+  s+=soft([[x0,y1,0],[x1,y1,0],[x1,y1,h],[x0,y1,h]],mix(color,-.03));
+  s+=soft([[x1,y0,0],[x1,y1,0],[x1,y1,h],[x1,y0,h]],mix(color,-.2));
+  s+=soft([[x0,y0,h],[x1,y0,h],[x1,y1,h],[x0,y1,h]],mix(color,.3));
+  if(st.tR) s+=poly([[x1,cy-.5,0],[x1,cy+.5,0],[x1,cy+.5,26],[x1,cy-.5,26]],'fill="var(--tunnel)"');
+  if(st.tL) s+=poly([[cx-.5,y1,0],[cx+.5,y1,0],[cx+.5,y1,26],[cx-.5,y1,26]],'fill="var(--tunnel)"');
+  return s;
+}
+const gSt=document.getElementById('stations'),gLab=document.getElementById('labels'),gPk=document.getElementById('packets'),svg=document.getElementById('svg');
+document.getElementById('belt').innerHTML=beltSVG();
+[...ST].sort((a,b)=>(a.cx+a.cy)-(b.cx+b.cy)).forEach(st=>{
+  const top=st.shape==='cyl'?iso(st.cx,st.cy,3*21-4+0):iso(st.cx,st.cy,st.h);
+  const T=st.shape==='cyl'?[iso(st.cx,st.cy,0)[0],iso(st.cx,st.cy,0)[1]-3*21+4]:top;
+  gSt.insertAdjacentHTML('beforeend',
+   `<g class="station" tabindex="0" role="button" data-id="${st.id}" aria-label="${st.name}" style="--glow:${st.color}">${stationSVG(st)}${st.icon?`<g transform="translate(${T[0].toFixed(1)},${T[1].toFixed(1)})"><g class="icon">${ICONS[st.icon]}</g></g>`:''}</g>`);
+  st.el=gSt.lastElementChild;st.activeUntil=0;
+});
+
+function layoutLabels(){
+  gLab.innerHTML='';
+  ST.forEach(st=>{
+    const [bx,by]=iso(st.cx,st.cy,0);
+    const g=document.createElementNS(NS,'g');g.setAttribute('class','label');g.dataset.id=st.id;
+    g.innerHTML=`<rect class="pill" rx="11"/><circle r="4.8" fill="${st.color}" stroke="${mix(st.color,-.25)}" stroke-width="1.5"/><text class="t1">${st.name}</text><text class="t2">${st.sub}</text>`;
+    gLab.appendChild(g);
+    const t1=g.querySelector('.t1'),t2=g.querySelector('.t2'),r=g.querySelector('rect'),c=g.querySelector('circle');
+    const w=Math.max(t1.getBBox().width,t2.getBBox().width),px=11,tw=w+px*2+14;
+    r.setAttribute('width',tw);r.setAttribute('height',37);
+    c.setAttribute('cx',px+4);c.setAttribute('cy',15);
+    t1.setAttribute('x',px+14);t1.setAttribute('y',16);t2.setAttribute('x',px+14);t2.setAttribute('y',30);
+    let x=bx+st.lab.dx;if(st.lab.a==='end')x-=tw;else if(st.lab.a==='middle')x-=tw/2;
+    g.setAttribute('transform',`translate(${x.toFixed(1)},${(by+st.lab.dy-18).toFixed(1)})`);
+  });
+}
+layoutLabels();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(layoutLabels);
+
+/* ---------- contenido informativo ---------- */
+const INFO={
+ client:{tier:'Fuera del sistema',tc:'#c7b6f2',t:'Cliente',d:'El navegador, la app móvil o cualquier otro servicio que inicia la petición. No conoce las capas internas: solo envía una solicitud y recibe la respuesta final.',tech:'React, Angular, Flutter, cURL',code:'GET /clientes/42 HTTP/1.1\nAccept: application/json'},
+ pres:{tier:'Capa 1',tc:'#9fd0f5',t:'Capa de presentación',d:'Es la puerta de entrada. Recibe la petición HTTP, valida su formato, convierte JSON a DTO y delega en la capa de negocio. No contiene reglas de negocio.',tech:'Spring MVC, ASP.NET Controllers, Express, FastAPI',code:'@GetMapping("/clientes/{id}")\npublic ClienteDTO get(@PathVariable Long id) {\n  return servicio.buscar(id);\n}'},
+ neg:{tier:'Capa 2',tc:'#a8e6cf',t:'Capa de negocio',d:'Implementa los casos de uso y las reglas del dominio: cálculos, permisos y transacciones. Orquesta a los repositorios sin saber cómo se guardan los datos.',tech:'Servicios, Domain, Use Cases',code:'public ClienteDTO buscar(Long id) {\n  validar(id);\n  return cache.get(id)\n    .orElseGet(() -> repo.findById(id));\n}'},
+ gate:{tier:'Capa 2',tc:'#e6c8f0',t:'Reglas de negocio',d:'El punto donde el negocio decide el camino. A: si el dato está en caché, responde directo. B: si no, consulta al repositorio. C: si una regla se viola, rechaza la petición sin tocar los datos.',tech:'Validators, Policies, Specification',code:'if (!valido(id))  throw new ReglaInvalida();\nif (cache.has(id)) return cache.get(id);\nreturn repo.findById(id);'},
+ repo:{tier:'Capa 3',tc:'#ffe08a',t:'Capa de acceso a datos',d:'Repositorios o DAO que traducen las operaciones del dominio a consultas. Aíslan al negocio del motor de base de datos: si cambias de SQL Server a PostgreSQL, solo cambia esta capa.',tech:'JPA/Hibernate, Entity Framework, Prisma, SQLAlchemy',code:'interface ClienteRepo\n  extends JpaRepository<Cliente, Long> {}\n-- SELECT * FROM clientes WHERE id = 42'},
+ db:{tier:'Capa 4',tc:'#8fb8f0',t:'Capa de datos',d:'Guarda la información de forma persistente y garantiza integridad, índices y transacciones. Solo la capa de acceso a datos habla con ella.',tech:'PostgreSQL, MySQL, SQL Server, MongoDB',code:'CREATE TABLE clientes (\n  id BIGINT PRIMARY KEY,\n  nombre TEXT NOT NULL\n);'},
+ cache:{tier:'Apoyo a la capa 2',tc:'#ffc9a6',t:'Caché',d:'Memoria rápida que evita ir a la base de datos para datos consultados con frecuencia. Baja la latencia de milisegundos a microsegundos.',tech:'Redis, Memcached, Caffeine',code:'GET cliente:42\n-> {"id":42,"nombre":"Ana"}'},
+ err:{tier:'Flujo de error',tc:'#ff9fa8',t:'Petición rechazada',d:'Cuando falla una validación o una regla de negocio, el flujo se corta y se devuelve un error controlado al cliente. La capa de datos nunca se entera.',tech:'HTTP 400, 401, 403, 422, exception handlers',code:'@ExceptionHandler(ReglaInvalida.class)\nResponseEntity<Error> handle(...) {\n  return status(422).body(error);\n}'}
+};
+const infoEl=document.getElementById('info');
+function renderIntro(){
+  infoEl.innerHTML='<h2>Cómo leer la escena</h2><p>Cada capa solo habla con la que tiene debajo. La petición avanza por la cinta, se transforma en cada estación (HTTP, DTO, comando, consulta) y regresa como respuesta.</p><p>Las tres ramas salen de las reglas de negocio: <b>A</b> acierto de caché, <b>B</b> consulta a la base de datos y <b>C</b> petición rechazada.</p><p class="tech">Toca una estación o su etiqueta para ver su rol.</p>';
+}
+renderIntro();
+let selected=null;
+function select(id){
+  if(selected)byId[selected].el.classList.remove('selected');
+  selected=id;const st=byId[id],i=INFO[id];st.el.classList.add('selected');
+  infoEl.innerHTML=`<span class="tier" style="background:${i.tc}"></span><h2></h2><p class="d"></p><p class="tech"></p><pre></pre>`;
+  infoEl.querySelector('.tier').textContent=i.tier;infoEl.querySelector('h2').textContent=i.t;
+  infoEl.querySelector('.d').textContent=i.d;infoEl.querySelector('.tech').textContent='Tecnologías: '+i.tech;
+  infoEl.querySelector('pre').textContent=i.code;
+}
+svg.addEventListener('click',e=>{const t=e.target.closest('[data-id]');if(t)select(t.dataset.id);});
+svg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const t=e.target.closest('[data-id]');if(t){e.preventDefault();select(t.dataset.id);}}});
+
+/* ---------- bitácora ---------- */
+const logEl=document.getElementById('log');
+function log(text,color){
+  const li=document.createElement('li');li.innerHTML='<i></i><span></span>';
+  li.querySelector('i').style.background=color;li.querySelector('span').textContent=text;
+  logEl.prepend(li);while(logEl.children.length>7)logEl.lastChild.remove();
+}
+const MSG={
+ client:{req:'Cliente: envía GET /clientes/42',resp:'Cliente: recibe la respuesta final'},
+ pres:{req:'Presentación: recibe el HTTP y lo convierte en DTO',resp:'Presentación: serializa el resultado a JSON'},
+ neg:{req:'Negocio: aplica el caso de uso y los permisos',resp:'Negocio: arma el resultado del dominio'},
+ gate:{req:r=>({db:'Reglas: no hay caché, se consulta al repositorio (B)',cache:'Reglas: hay caché, se evita la base de datos (A)',err:'Reglas: una regla se viola, se rechaza (C)'}[r]),resp:'Reglas: devuelve el resultado hacia arriba'},
+ repo:{req:'Repositorio: traduce a SELECT ... WHERE id = 42',resp:'Repositorio: convierte las filas en entidades'},
+ db:{req:'Base de datos: ejecuta la consulta',resp:'Base de datos: devuelve las filas'},
+ cache:{req:'Caché: busca la clave en memoria',resp:'Caché: devuelve el valor guardado'},
+ err:{req:'Rechazo: se genera un error 422 sin tocar los datos',resp:'Rechazo: el error vuelve al cliente'}
+};
+
+/* ---------- paquetes ---------- */
+const packets=[];
+const L=(x,y,z)=>[(x-y)*W,(x+y)*H-z];
+const lp=(pts,f)=>`<polygon points="${pts.map(q=>L(...q).map(n=>n.toFixed(1)).join(',')).join(' ')}" fill="${f}" stroke="${f}" stroke-width="2" stroke-linejoin="round"/>`;
+function paintCube(p){
+  const s=.3,z0=9,hz=13,c=p.color;
+  p.cube.innerHTML=lp([[-s,s,z0],[s,s,z0],[s,s,z0+hz],[-s,s,z0+hz]],mix(c,-.02))+lp([[s,-s,z0],[s,s,z0],[s,s,z0+hz],[s,-s,z0+hz]],mix(c,-.22))+lp([[-s,-s,z0+hz],[s,-s,z0+hz],[s,s,z0+hz],[-s,s,z0+hz]],mix(c,.32));
+}
+function setLabel(p,text){
+  p.text.textContent=text;const b=p.text.getBBox();
+  p.rect.setAttribute('x',b.x-7);p.rect.setAttribute('y',b.y-3);p.rect.setAttribute('width',b.width+14);p.rect.setAttribute('height',b.height+6);
+}
+function reqLabel(p){
+  const s=p.s,r=p.route;
+  if(s<2)return 'HTTP';
+  if(s<6.2)return 'DTO';
+  if(s<13.2)return 'Comando';
+  if(r==='db')return s<=14.8?'Comando':(s<19.1?'Consulta SQL':'Consulta SQL');
+  if(r==='cache')return s<=14.8?'Comando':'get(clave)';
+  return s<=14.8?'Comando':'Excepción';
+}
+function respLabel(p){
+  const s=p.s,r=p.route;
+  if(s>14.8)return {db:'Entidades',cache:'Valor',err:'Error 422'}[r];
+  if(s>6.2)return r==='err'?'Error':'Resultado';
+  if(s>2)return r==='err'?'DTO error':'DTO';
+  return r==='err'?'JSON 422':'JSON 200';
+}
+function colorFor(p){
+  if(p.phase==='req')return (p.route==='err'&&p.s>14.8)?'#ff7d89':'#6aa8ff';
+  return {db:'#3fcf95',cache:'#ffb347',err:'#ff7d89'}[p.route];
+}
+function spawn(key){
+  if(packets.length>=8)return;
+  if(key==='random'){const r=Math.random();key=r<.5?'db':r<.8?'cache':'err';}
+  const g=document.createElementNS(NS,'g');
+  g.innerHTML='<ellipse rx="15" ry="7.5" cy="3" fill="rgba(20,30,60,.22)"/><g class="cube"></g><g><rect rx="9" fill="var(--pill)" stroke="var(--line)" stroke-width="1.5"/><text y="-31" text-anchor="middle" font-size="10.5" font-weight="900" fill="var(--ink)"></text></g>';
+  gPk.appendChild(g);
+  const p={route:key,s:0,dir:1,phase:'req',wait:0,inside:null,g,cube:g.querySelector('.cube'),text:g.querySelector('text'),rect:g.querySelector('rect'),color:'',lab:''};
+  g.style.visibility='hidden';
+  packets.push(p);
+}
+function stationAt(p){
+  for(const st of ST){const iv=st.iv[p.route]||st.iv.all;if(iv&&p.s>=iv[0]&&p.s<=iv[1])return st;}
+  return null;
+}
+function activate(st,p,now){
+  st.activeUntil=now+950;
+  let m=MSG[st.id][p.phase];if(typeof m==='function')m=m(p.route);
+  log(m,ROUTES[p.route].color);
+}
+
+/* ---------- bucle ---------- */
+const BASE=3.1;let last=performance.now(),autoT=1.2;
+const autoEl=document.getElementById('auto'),speedEl=document.getElementById('speed');
+if(reduce)autoEl.checked=false;
+function frame(t){
+  const dt=Math.min(.05,(t-last)/1000);last=t;
+  const mul=parseFloat(speedEl.value);
+  if(autoEl.checked){autoT-=dt;if(autoT<=0){spawn('random');autoT=(3.4+Math.random()*1.6)/mul;}}
+  for(let i=packets.length-1;i>=0;i--){
+    const p=packets[i],R=ROUTES[p.route];
+    if(p.wait>0){p.wait-=dt;}
+    else{
+      const cur=stationAt(p);
+      p.s+=p.dir*BASE*mul*(cur?.55:1)*dt;
+      if(p.dir===1&&p.s>=R.len){p.s=R.len;p.dir=-1;p.phase='resp';p.wait=.55/mul;p.inside=null;}
+      if(p.dir===-1&&p.s<=0){p.g.remove();packets.splice(i,1);continue;}
+    }
+    const st=stationAt(p);
+    if(st!==p.inside){if(st)activate(st,p,t);p.inside=st;}
+    const lab=p.phase==='req'?reqLabel(p):respLabel(p),col=colorFor(p);
+    if(col!==p.color){p.color=col;paintCube(p);}
+    if(lab!==p.lab){p.lab=lab;setLabel(p,lab);}
+    const [x,y]=at(R,p.s),[sx,sy]=iso(x,y,0);
+    p.g.setAttribute('transform',`translate(${sx.toFixed(1)},${sy.toFixed(1)})`);
+    p.g.style.visibility=st?'hidden':'visible';
+  }
+  ST.forEach(s=>s.el.classList.toggle('active',t<s.activeUntil));
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+if(!reduce)setTimeout(()=>spawn('db'),400);
+
+document.querySelectorAll('[data-route]').forEach(b=>b.addEventListener('click',()=>spawn(b.dataset.route)));
+})();
+</script>
+</body>
+</html>
