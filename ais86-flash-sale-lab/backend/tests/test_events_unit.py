@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from app.events import validate_cloud_event
+from app.events import build_order_created_event, validate_cloud_event
 
 
 def complete_event() -> dict:
@@ -25,6 +25,19 @@ def complete_event() -> dict:
 
 def test_valid_event_passes() -> None:
     assert validate_cloud_event(complete_event()) == []
+
+
+def test_order_created_builder_emits_complete_event() -> None:
+    event = build_order_created_event(
+        uuid.uuid4(),
+        [{"product_id": "nova-headphones", "quantity": 2}],
+        199900,
+        datetime.now(timezone.utc),
+    )
+
+    assert event["type"] == "pe.unamba.flash.order.created.v1"
+    assert event["data"]["total_cents"] == 199900
+    assert validate_cloud_event(event) == []
 
 
 def test_event_requires_identity_fields() -> None:
