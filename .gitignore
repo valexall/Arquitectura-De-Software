@@ -132,3 +132,15 @@ $RECYCLE.BIN/
 ._*
 .Spotlight-V100
 .Trashes
+
+# ------------------------------------------------------------------------------
+# Artefactos generados por herramientas de desarrollo y pruebas
+# ------------------------------------------------------------------------------
+**/playwright-report/
+**/test-results/
+**/reports/
+**/coverage/
+**/.impeccable/
+**/.bridge-probe
+**/PRODUCT.md
+**/DESIGN.md
