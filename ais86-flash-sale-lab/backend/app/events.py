@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -10,7 +11,7 @@ from typing import Any
 
 from redis.asyncio import Redis
 from redis.exceptions import ResponseError
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -71,6 +72,18 @@ def _parse_time(value: Any) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _dataset_lock_key(dataset_id: str) -> int:
+    digest = hashlib.sha256(f"dataset:{dataset_id}".encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big", signed=True)
+
+
+async def _lock_dataset(session: AsyncSession, dataset_id: str) -> None:
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:lock_key)"),
+        {"lock_key": _dataset_lock_key(dataset_id)},
+    )
 
 
 def validate_cloud_event(payload: Any) -> list[str]:
@@ -250,6 +263,7 @@ async def _mark_rejected(
                 order = await session.get(Order, order_id)
                 if order is not None:
                     dataset_id = order.dataset_id
+                    await _lock_dataset(session, dataset_id)
                     await session.execute(
                         update(Order)
                         .where(Order.id == order_id, Order.notification_status != "sent")
@@ -306,6 +320,7 @@ async def _process_valid_event(
 
     async with session_factory() as session:
         async with session.begin():
+            await _lock_dataset(session, dataset_id)
             order = await session.get(Order, order_id)
             if order is None:
                 return
@@ -390,6 +405,8 @@ async def delete_dataset_rows(session: AsyncSession, dataset_ids: list[str]) -> 
     safe_ids = [dataset_id for dataset_id in dataset_ids if dataset_id != PUBLIC_DATASET]
     if not safe_ids:
         return
+    for dataset_id in sorted(safe_ids):
+        await _lock_dataset(session, dataset_id)
     order_ids = select(Order.id).where(Order.dataset_id.in_(safe_ids))
     await session.execute(delete(Notification).where(Notification.dataset_id.in_(safe_ids)))
     await session.execute(delete(EventRecord).where(EventRecord.dataset_id.in_(safe_ids)))
