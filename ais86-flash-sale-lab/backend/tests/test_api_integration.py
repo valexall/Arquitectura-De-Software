@@ -151,6 +151,9 @@ def test_order_validation_and_stock(client: TestClient) -> None:
         [],
         [{"product_id": "nova-headphones", "quantity": 0}],
         [{"product_id": "nova-headphones", "quantity": 6}],
+        [{"product_id": "nova-headphones", "quantity": "2"}],
+        [{"product_id": "nova-headphones", "quantity": True}],
+        [{"product_id": "nova-headphones", "quantity": 2.0}],
         [{"product_id": "a" * 65, "quantity": 1}],
         [
             {"product_id": "nova-headphones", "quantity": 1},
