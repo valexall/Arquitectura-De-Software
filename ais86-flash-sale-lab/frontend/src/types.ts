@@ -21,6 +21,25 @@ export interface Catalog {
 }
 
 export type NotificationStatus = 'pending' | 'sent' | 'failed';
+export type BillingStatus = 'pending' | 'issued' | 'failed';
+
+export interface BillingState {
+  status: BillingStatus;
+  invoice_id: string | null;
+  attempts: number;
+  invoice: Invoice | null;
+}
+
+export interface Invoice {
+  id: string;
+  issuer_id: string;
+  order_id: string;
+  currency: 'PEN';
+  items: OrderLine[];
+  total_cents: number;
+  status: 'issued';
+  created_at: string;
+}
 
 export interface OrderLine {
   product_id: string;

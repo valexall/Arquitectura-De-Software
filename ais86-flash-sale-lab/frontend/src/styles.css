@@ -1521,6 +1521,121 @@ svg {
   margin-top: 10px;
 }
 
+.billing-invoice-id {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.invoice-document {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid #bcd9c9;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.invoice-document-head,
+.invoice-line,
+.invoice-total {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.invoice-document-head h3 {
+  margin: 2px 0 0;
+  font-size: 1.12rem;
+}
+
+.invoice-eyebrow {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.invoice-badge {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.invoice-data {
+  display: grid;
+  gap: 7px;
+  margin: 16px 0;
+  padding: 12px 0;
+  border-block: 1px dashed var(--line-strong);
+}
+
+.invoice-data > div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.invoice-data dt,
+.invoice-data dd {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.invoice-data dt {
+  color: var(--ink-muted);
+  font-weight: 700;
+}
+
+.invoice-data dd {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.invoice-lines {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invoice-line {
+  font-size: 0.78rem;
+}
+
+.invoice-line span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.invoice-line strong {
+  white-space: nowrap;
+}
+
+.invoice-total {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px solid var(--ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.invoice-total strong {
+  font-size: 1.16rem;
+}
+
+.invoice-disclaimer {
+  margin: 14px 0 0;
+  color: var(--ink-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
 .notice-pending {
   border-color: #efd79b;
   background: var(--warn-soft);

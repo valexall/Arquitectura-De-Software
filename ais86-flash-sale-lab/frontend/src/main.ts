@@ -1,6 +1,15 @@
 import '@fontsource-variable/manrope';
 import './styles.css';
-import { ApiError, createOrder, fetchCatalog, fetchOrder, friendlyError, isAbortError } from './api';
+import {
+  ApiError,
+  createOrder,
+  fetchBilling,
+  fetchCatalog,
+  fetchOrder,
+  friendlyError,
+  isAbortError,
+  retryBilling
+} from './api';
 import {
   MAX_DISTINCT_PRODUCTS,
   addLine,
@@ -26,9 +35,10 @@ import {
   writeStoredCart
 } from './storage';
 import type { AttemptRecord } from './storage';
-import type { CartLine, Catalog, Order, Product } from './types';
+import type { BillingState, CartLine, Catalog, Order, Product } from './types';
 import {
   applyStockChip,
+  billingNode,
   cartPanelNodes,
   configureAddButton,
   emptyCatalogNode,
@@ -58,6 +68,7 @@ let searchQuery = '';
 let featuredProduct: Product | null = null;
 let panelMode: PanelMode = 'cart';
 let activeOrder: Order | null = null;
+let activeBilling: BillingState | null = null;
 let orderError = '';
 let orderErrorCode = '';
 let creating = false;
@@ -684,6 +695,9 @@ function onPanelBodyClick(event: MouseEvent): void {
     case 'poll-again':
       startPolling();
       break;
+    case 'retry-billing':
+      void retryActiveBilling(button);
+      break;
     case 'open-track':
       setPanelMode('track');
       break;
@@ -738,7 +752,7 @@ function renderPanelBody(resetScroll: boolean): void {
       creating
     });
   } else if (panelMode === 'receipt') {
-    nodes = receiptPanelNodes(activeOrder, pollState, pollMessage);
+    nodes = receiptPanelNodes(activeOrder, activeBilling, pollState, pollMessage);
   } else {
     nodes = trackPanelNodes(trackingValue, trackingError, trackingBusy);
   }
@@ -884,14 +898,13 @@ function beginReceipt(order: Order): void {
   abortTracking();
   stopPolling();
   activeOrder = order;
+  activeBilling = null;
   panelMode = 'receipt';
-  pollState = order.notification_status === 'pending' ? 'polling' : 'idle';
+  pollState = 'polling';
   pollMessage = '';
   renderPanel(true);
   focusPanelStart('receipt');
-  if (order.notification_status === 'pending') {
-    startPolling();
-  }
+  startPolling();
 }
 
 function startPolling(): void {
@@ -900,7 +913,11 @@ function startPolling(): void {
   }
   const order = activeOrder;
   stopPolling();
-  if (order.notification_status !== 'pending') {
+  if (
+    order.notification_status !== 'pending' &&
+    activeBilling !== null &&
+    activeBilling.status !== 'pending'
+  ) {
     updateReceiptNotification();
     return;
   }
@@ -919,12 +936,16 @@ function startPolling(): void {
     }
     pollAttempts += 1;
     try {
-      const next = await fetchOrder(order.id, controller.signal);
+      const [next, billing] = await Promise.all([
+        fetchOrder(order.id, controller.signal),
+        fetchBilling(order.id, controller.signal)
+      ]);
       if (token !== pollToken) {
         return;
       }
       activeOrder = next;
-      if (next.notification_status !== 'pending') {
+      activeBilling = billing;
+      if (next.notification_status !== 'pending' && billing.status !== 'pending') {
         pollState = 'idle';
         pollMessage = '';
         clearPolling();
@@ -983,6 +1004,32 @@ function updateReceiptNotification(): void {
   const current = ui.panelBody.querySelector('[data-receipt-status]');
   if (current) {
     current.replaceWith(notificationNode(activeOrder, pollState, pollMessage));
+  }
+  const billing = ui.panelBody.querySelector('[data-billing-status]');
+  if (billing) {
+    billing.replaceWith(billingNode(activeBilling, pollState));
+  }
+}
+
+async function retryActiveBilling(button: HTMLElement): Promise<void> {
+  if (!activeOrder || !(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  button.disabled = true;
+  const original = button.textContent ?? 'Reintentar facturación';
+  button.textContent = 'Reintentando…';
+  try {
+    activeBilling = await retryBilling(activeOrder.id);
+    updateReceiptNotification();
+    if (activeBilling.status === 'issued') {
+      showToast('Comprobante emitido correctamente.');
+    } else {
+      showToast('La facturación sigue pendiente. Puedes volver a intentarlo.', 'warn');
+    }
+  } catch {
+    button.disabled = false;
+    button.textContent = original;
+    showToast('No pudimos reintentar la facturación.', 'warn');
   }
 }
 

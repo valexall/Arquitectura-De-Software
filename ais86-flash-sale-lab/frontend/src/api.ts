@@ -1,4 +1,6 @@
 import type {
+  BillingState,
+  BillingStatus,
   Catalog,
   Campaign,
   NotificationStatus,
@@ -51,6 +53,10 @@ function isInteger(value: unknown): value is number {
 
 function isNotificationStatus(value: unknown): value is NotificationStatus {
   return value === 'pending' || value === 'sent' || value === 'failed';
+}
+
+function isBillingStatus(value: unknown): value is BillingStatus {
+  return value === 'pending' || value === 'issued' || value === 'failed';
 }
 
 function invalidResponse(): ApiError {
@@ -155,6 +161,44 @@ function parseOrder(value: unknown): Order {
     notification_status: value.notification_status,
     items: value.items.map(parseOrderLine),
     total_cents: readInteger(value, 'total_cents', 0),
+    created_at: createdAt
+  };
+}
+
+function parseBilling(value: unknown): BillingState {
+  if (!isRecord(value) || !isBillingStatus(value.status)) {
+    throw invalidResponse();
+  }
+  if (value.invoice_id !== null && typeof value.invoice_id !== 'string') {
+    throw invalidResponse();
+  }
+  return {
+    status: value.status,
+    invoice_id: value.invoice_id,
+    attempts: readInteger(value, 'attempts', 0),
+    invoice: value.invoice === null ? null : parseInvoice(value.invoice)
+  };
+}
+
+function parseInvoice(value: unknown): BillingState['invoice'] {
+  if (!isRecord(value) || value.currency !== 'PEN' || value.status !== 'issued') {
+    throw invalidResponse();
+  }
+  if (!Array.isArray(value.items) || value.items.length === 0) {
+    throw invalidResponse();
+  }
+  const createdAt = readString(value, 'created_at');
+  if (Number.isNaN(new Date(createdAt).getTime())) {
+    throw invalidResponse();
+  }
+  return {
+    id: readString(value, 'id'),
+    issuer_id: readString(value, 'issuer_id'),
+    order_id: readString(value, 'order_id'),
+    currency: 'PEN',
+    items: value.items.map(parseOrderLine),
+    total_cents: readInteger(value, 'total_cents', 0),
+    status: 'issued',
     created_at: createdAt
   };
 }
@@ -286,6 +330,23 @@ export async function createOrder(
 export async function fetchOrder(id: string, signal?: AbortSignal): Promise<Order> {
   const response = await request(`/api/v1/orders/${encodeURIComponent(id)}`, { signal });
   return parseOrder(response.payload);
+}
+
+export async function fetchBilling(id: string, signal?: AbortSignal): Promise<BillingState> {
+  const response = await request(`/api/v1/orders/${encodeURIComponent(id)}/billing`, {
+    signal,
+    timeoutMs: 20000
+  });
+  return parseBilling(response.payload);
+}
+
+export async function retryBilling(id: string, signal?: AbortSignal): Promise<BillingState> {
+  const response = await request(`/api/v1/orders/${encodeURIComponent(id)}/billing/retry`, {
+    method: 'POST',
+    signal,
+    timeoutMs: 20000
+  });
+  return parseBilling(response.payload);
 }
 
 export function friendlyError(error: unknown, context: 'catalog' | 'create' | 'order'): FriendlyError {

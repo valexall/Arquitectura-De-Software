@@ -9,7 +9,7 @@ import {
 import { el, icon } from './dom';
 import { formatDateTime, formatMoney } from './format';
 import { productImage } from './shell';
-import type { CartLine, Catalog, NotificationStatus, Order, Product } from './types';
+import type { BillingState, CartLine, Catalog, NotificationStatus, Order, Product } from './types';
 
 export type CatalogState = 'loading' | 'ready' | 'error';
 export type PollState = 'idle' | 'polling' | 'timeout' | 'error';
@@ -481,6 +481,7 @@ function stockNote(
 
 export function receiptPanelNodes(
   order: Order | null,
+  billing: BillingState | null,
   pollState: PollState,
   pollMessage: string
 ): Node[] {
@@ -538,6 +539,7 @@ export function receiptPanelNodes(
   );
 
   const notification = notificationNode(order, pollState, pollMessage);
+  const billingStatus = billingNode(billing, pollState);
 
   const items = el('ul', { class: 'receipt-items' });
   for (const line of order.items) {
@@ -578,6 +580,7 @@ export function receiptPanelNodes(
     banner,
     idBlock,
     notification,
+    billingStatus,
     el('h3', { class: 'section-label' }, 'Productos'),
     items,
     total,
@@ -588,6 +591,121 @@ export function receiptPanelNodes(
     ),
     actions
   ];
+}
+
+export function billingNode(billing: BillingState | null, pollState: PollState): HTMLElement {
+  const status = billing?.status ?? 'pending';
+  const tone = status === 'issued' ? 'sent' : status;
+  const label =
+    status === 'issued'
+      ? 'Comprobante emitido'
+      : status === 'failed'
+        ? 'Facturación pendiente'
+        : 'Generando comprobante';
+  const wrapper = el('div', {
+    class: `notice notice-${tone}`,
+    role: 'status',
+    'aria-live': 'polite',
+    'data-billing-status': ''
+  });
+  wrapper.append(
+    el(
+      'div',
+      { class: 'notice-head' },
+      el('span', { class: `status-dot status-dot-${tone}`, 'aria-hidden': 'true' }),
+      el('p', { class: 'notice-title' }, label)
+    )
+  );
+  if (status === 'issued' && billing?.invoice_id) {
+    wrapper.append(
+      el('p', { class: 'notice-text' }, 'El microservicio generó el comprobante interno.'),
+      el('p', { class: 'notice-meta billing-invoice-id' }, `Factura: ${billing.invoice_id}`)
+    );
+    if (billing.invoice) {
+      const invoice = billing.invoice;
+      const lines = el('ul', { class: 'invoice-lines' });
+      for (const item of invoice.items) {
+        lines.append(
+          el(
+            'li',
+            { class: 'invoice-line' },
+            el(
+              'span',
+              {},
+              `${item.name} · ${item.quantity} × ${formatMoney(item.unit_price_cents)}`
+            ),
+            el('strong', {}, formatMoney(item.quantity * item.unit_price_cents))
+          )
+        );
+      }
+      wrapper.append(
+        el(
+          'section',
+          { class: 'invoice-document', 'aria-label': 'Comprobante interno de demostración' },
+          el(
+            'div',
+            { class: 'invoice-document-head' },
+            el(
+              'div',
+              {},
+              el('p', { class: 'invoice-eyebrow' }, 'AIS86 · FACTURACIÓN'),
+              el('h3', {}, 'Comprobante interno')
+            ),
+            el('span', { class: 'invoice-badge' }, 'EMITIDO')
+          ),
+          el(
+            'dl',
+            { class: 'invoice-data' },
+            el('div', {}, el('dt', {}, 'Número'), el('dd', {}, invoice.id)),
+            el('div', {}, el('dt', {}, 'Pedido'), el('dd', {}, invoice.order_id)),
+            el('div', {}, el('dt', {}, 'Emisor'), el('dd', {}, invoice.issuer_id)),
+            el('div', {}, el('dt', {}, 'Fecha'), el('dd', {}, formatDateTime(invoice.created_at))),
+            el('div', {}, el('dt', {}, 'Moneda'), el('dd', {}, invoice.currency))
+          ),
+          lines,
+          el(
+            'div',
+            { class: 'invoice-total' },
+            el('span', {}, 'TOTAL'),
+            el('strong', {}, formatMoney(invoice.total_cents))
+          ),
+          el(
+            'p',
+            { class: 'invoice-disclaimer' },
+            'Documento de demostración académica. No es un comprobante electrónico SUNAT ni acredita pago.'
+          )
+        )
+      );
+    }
+  } else if (status === 'failed') {
+    wrapper.append(
+      el(
+        'p',
+        { class: 'notice-text' },
+        'El pedido sigue confirmado. Puedes reintentar con el mismo ID sin duplicar la factura.'
+      ),
+      actionButton('retry-billing', 'Reintentar facturación', 'refresh')
+    );
+  } else {
+    wrapper.append(
+      el(
+        'p',
+        { class: 'notice-text' },
+        'La facturación se procesa de forma independiente al pedido.'
+      )
+    );
+    if (pollState === 'polling') {
+      wrapper.append(
+        el(
+          'p',
+          { class: 'notice-meta' },
+          el('span', { class: 'spinner', 'aria-hidden': 'true' }),
+          'Consultando facturación…'
+        )
+      );
+    }
+  }
+  return wrapper;
 }
 
 export function notificationNode(
