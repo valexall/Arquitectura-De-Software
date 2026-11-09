@@ -55,4 +55,10 @@ El frontend está en `frontend/`; para desarrollarlo: `npm ci`, `npm run dev`, `
 
 Semanas10–15 evolucionarán sobre esta misma base; sus pruebas no son requisitos de Semana9.
 
+## Semana 11: facturación
+
+El backend/worker puede emitir comprobantes mediante el microservicio ubicado en `../billing-service`. Configura `BILLING_BASE_URL` y `BILLING_TOKEN` en `.env` y recrea `api` y `worker`. Si el proveedor falla, el pedido permanece confirmado y el estado queda recuperable.
+
+Consulta el estado con `GET /api/v1/orders/{id}/billing` y reintenta manualmente con `POST /api/v1/orders/{id}/billing/retry`, usando las mismas cabeceras de aislamiento de S09. El token de facturación nunca se envía al navegador.
+
 [Cloudflare Quick Tunnels: condiciones y límites](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).

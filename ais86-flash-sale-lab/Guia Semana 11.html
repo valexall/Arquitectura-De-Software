@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Semana 11 — Microservicio de facturación con Supabase | AIS86</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-hover: #334155;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-dim: rgba(56, 189, 248, 0.12);
+      --accent: #10b981;
+      --accent-dim: rgba(16, 185, 129, 0.12);
+      --warning: #f59e0b;
+      --warning-dim: rgba(245, 158, 11, 0.12);
+      --danger: #ef4444;
+      --danger-dim: rgba(239, 68, 68, 0.12);
+      --code-bg: #090d16;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 290px;
+      background: var(--bg);
+      border-right: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 1.5rem 1rem;
+      flex-shrink: 0;
+      display: none;
+    }
+
+    @media (min-width: 1024px) {
+      .sidebar {
+        display: block;
+      }
+    }
+
+    .sidebar-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--primary);
+      margin-bottom: 0.75rem;
+      font-weight: 700;
+    }
+
+    .sidebar-nav {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .sidebar-nav a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      display: block;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-nav a:hover {
+      color: var(--text);
+      background-color: var(--surface);
+    }
+
+    /* Main Container */
+    .content {
+      flex: 1;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 6rem;
+    }
+
+    @media (min-width: 768px) {
+      .content {
+        padding: 3.5rem 3rem 6rem;
+      }
+    }
+
+    /* Header Banner */
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--primary-dim);
+      color: var(--primary);
+      padding: 0.35rem 0.8rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    h1 {
+      font-size: 2.15rem;
+      line-height: 1.25;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.6rem;
+    }
+
+    .subtitle {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    /* Callout & Alerts */
+    .callout {
+      border-radius: 8px;
+      padding: 1.15rem 1.35rem;
+      margin: 1.5rem 0;
+      border-left: 4px solid;
+      background: var(--surface);
+    }
+
+    .callout.info {
+      border-color: var(--primary);
+      background: var(--primary-dim);
+    }
+
+    .callout.warning {
+      border-color: var(--warning);
+      background: var(--warning-dim);
+    }
+
+    .callout.accent {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .callout-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Typography & Sections */
+    h2 {
+      font-size: 1.45rem;
+      margin-top: 3.25rem;
+      margin-bottom: 1.15rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      margin-top: 2rem;
+      margin-bottom: 0.85rem;
+      color: #e2e8f0;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      color: #cbd5e1;
+    }
+
+    ul,
+    ol {
+      margin: 0.85rem 0 1.25rem 1.5rem;
+      color: #cbd5e1;
+    }
+
+    li {
+      margin-bottom: 0.45rem;
+    }
+
+    strong {
+      color: var(--text);
+    }
+
+    /* Tables */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin: 1.35rem 0 1.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      text-align: left;
+    }
+
+    th,
+    td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: rgba(15, 23, 42, 0.8);
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Code Blocks */
+    .code-wrapper {
+      position: relative;
+      margin: 1.25rem 0 1.75rem;
+      border-radius: 8px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: #131b2e;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      transition: all 0.15s ease;
+    }
+
+    .copy-btn:hover {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--primary);
+    }
+
+    pre {
+      padding: 1.15rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      line-height: 1.5;
+      color: #e2e8f0;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+    }
+
+    :not(pre)>code {
+      background: #1e293b;
+      color: #38bdf8;
+      padding: 0.18rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Checklists */
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .checklist li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      background: var(--surface);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      margin-bottom: 0;
+    }
+
+    .checklist-icon {
+      color: var(--accent);
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .footer {
+      margin-top: 5rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .footer a {
+      color: var(--primary);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="layout">
+    <!-- Sidebar Table of Contents -->
+    <aside class="sidebar">
+      <div class="sidebar-title">Contenido de la Guía</div>
+      <ul class="sidebar-nav">
+        <li><a href="#resultado">Resultado y Alcance</a></li>
+        <li><a href="#seccion-1">1. Lo relevante antes de empezar</a></li>
+        <li><a href="#seccion-2">2. Contrato de la API</a></li>
+        <li><a href="#seccion-3">3. Preparar el proyecto</a></li>
+        <li><a href="#seccion-4">4. Tabla y cierre de acceso directo</a></li>
+        <li><a href="#seccion-5">5. Credenciales para dos tiendas</a></li>
+        <li><a href="#seccion-6">6. Implementar Edge Function</a></li>
+        <li><a href="#seccion-7">7. Desplegar sin Docker</a></li>
+        <li><a href="#seccion-8">8. Pruebas antes de tocar S09</a></li>
+        <li><a href="#seccion-9">9. Integración en aplicativo S09</a></li>
+        <li><a href="#seccion-10">10. Validación entre compañeros</a></li>
+        <li><a href="#seccion-11">11. Guardar y entregar</a></li>
+        <li><a href="#seccion-12">12. Errores frecuentes</a></li>
+        <li><a href="#referencias">Verificación y Fuentes</a></li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="content">
+
+      <div class="header-badge">AIS86 · Arquitectura del Software · Guía del estudiante</div>
+      <h1>Semana 11 — Microservicio de facturación con Supabase</h1>
+      <p class="subtitle">Guía de implementación, despliegue serverless, persistencia en PostgreSQL y consumo
+        idempotente resiliente.</p>
+
+      <!-- Overview Banner -->
+      <section id="resultado" class="callout accent">
+        <div class="callout-title">
+          <span>🎯</span> Resultado esperado
+        </div>
+        <p>Un servicio independiente, desplegado por HTTPS, que recibe pedidos confirmados, conserva comprobantes
+          internos en PostgreSQL y permite consultarlos sin duplicarlos al reintentar. Lo construyes en un repositorio
+          nuevo. Después integras su API en tu aplicativo corregido de Semana 9, sin reemplazarlo.</p>
+      </section>
+
+      <div class="callout warning">
+        <div class="callout-title">
+          <span>⚠️</span> Alcance de demostración pedagógica
+        </div>
+        <p>Es facturación de demostración: no cobra dinero, no emite comprobantes electrónicos SUNAT, no calcula IGV ni
+          requiere datos personales. <code>issued</code> significa «comprobante interno generado»; no significa
+          «pagado». En S09, <code>confirmed</code> significa stock asignado, no cobro realizado.</p>
+      </div>
+
+      <!-- Section 1 -->
+      <section id="seccion-1">
+        <h2>1. Lo relevante antes de empezar</h2>
+        <p>Terminología clave para comprender el diseño arquitectónico, el código y la asistencia de IA:</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Término</th>
+                <th>Significado en esta práctica</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Capacidad de negocio</strong></td>
+                <td>Algo que hace el negocio: aquí, emitir y consultar comprobantes. No separar servicios solo por
+                  tabla, lenguaje o capa técnica.</td>
+              </tr>
+              <tr>
+                <td><strong>Microservicio</strong></td>
+                <td>Una capacidad con contrato y despliegue independientes y propiedad de sus datos. Tener otro repo o
+                  una URL no basta.</td>
+              </tr>
+              <tr>
+                <td><strong>BaaS (Backend as a Service)</strong></td>
+                <td>Servicios de backend administrados: Supabase proporciona PostgreSQL, API de datos, Auth, Storage y
+                  ejecución de funciones. Nosotros elegimos cuáles usar.</td>
+              </tr>
+              <tr>
+                <td><strong>Edge Function / serverless</strong></td>
+                <td>Código de servidor que Supabase ejecuta al recibir HTTP. Escribes la lógica sin administrar una
+                  máquina virtual. Sigue habiendo servidores, latencia y posibles fallos.</td>
+              </tr>
+              <tr>
+                <td><strong>Endpoint</strong></td>
+                <td>Método + ruta, por ejemplo <code>POST /invoices</code>.</td>
+              </tr>
+              <tr>
+                <td><strong>Contrato</strong></td>
+                <td>Reglas de entrada, autenticación, respuestas, errores e idempotencia que proveedor y consumidor
+                  deben respetar.</td>
+              </tr>
+              <tr>
+                <td><strong>Snapshot</strong></td>
+                <td>Copia de los datos del pedido en ese momento. Cambiar el catálogo mañana no debe cambiar un
+                  comprobante ya emitido.</td>
+              </tr>
+              <tr>
+                <td><strong>Autenticación / autorización</strong></td>
+                <td>Identificar al consumidor / decidir qué datos puede usar. Un token válido no debe dar acceso a las
+                  otras tiendas.</td>
+              </tr>
+              <tr>
+                <td><strong>JWT / API key</strong></td>
+                <td>Un JWT contiene declaraciones firmadas; una API key acredita una aplicación. Las nuevas claves
+                  <code>sb_publishable_...</code> y <code>sb_secret_...</code> no son JWT. Nuestro token de facturación
+                  tampoco lo es [2].</td>
+              </tr>
+              <tr>
+                <td><strong>RLS (Row Level Security)</strong></td>
+                <td>Reglas de PostgreSQL para limitar las filas a las que puede acceder un rol. No reemplaza los
+                  permisos de tabla ni la autorización del endpoint [3].</td>
+              </tr>
+              <tr>
+                <td><strong>Idempotencia</strong></td>
+                <td>Repetir la misma operación no crea otro efecto. Aquí: una factura por <code>(tienda, pedido)</code>,
+                  aunque lleguen reintentos simultáneos.</td>
+              </tr>
+              <tr>
+                <td><strong>Timeout / retry</strong></td>
+                <td>Límite de espera / reintento de una operación transitoria. Un timeout no demuestra que el servidor
+                  no haya guardado la factura.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Cómo actúa Supabase como backend</h3>
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>Flujo de Arquitectura y Comunicación</span>
+          </div>
+          <pre><code>Navegador del aplicativo S09
+        │
+        ▼
+Backend/worker S09 en tu PC        ← código del estudiante
+        │ HTTPS + X-Billing-Token + JSON
+        ▼
+Supabase Edge Function: billing   ← nuestra lógica TypeScript/Deno
+        │ supabase-js / API de datos PostgREST
+        ▼
+PostgreSQL: public.invoices        ← persistencia del servicio</code></pre>
+        </div>
+
+        <p>La Edge Function autentica, valida, calcula el total y decide qué hacer ante duplicados. La API de datos
+          traduce operaciones del cliente a consultas PostgreSQL. PostgreSQL guarda las facturas y hace cumplir la
+          unicidad. Supabase administra esa infraestructura; no inventa las reglas de facturación por nosotros [1].</p>
+
+        <p>No necesitamos Supabase Auth, Storage ni Realtime para esta práctica. Tampoco un servidor FastAPI adicional
+          dentro del nuevo repo: la Edge Function ya es nuestro backend HTTP. La tienda no obtiene acceso a tablas;
+          obtiene acceso a una API acotada.</p>
+
+        <p><strong>Propiedad de datos:</strong> S09 conserva pedidos y stock; facturación conserva comprobantes. Copiar
+          un snapshot no es compartir una tabla. En esta práctica usas un proyecto Supabase propio para facturación. El
+          patrón no exige necesariamente un servidor físico de base de datos por microservicio: también puede haber
+          aislamiento lógico y permisos exclusivos [10].</p>
+
+        <h3>Por qué usar RLS si ya tenemos un backend</h3>
+        <p>Supabase puede exponer tablas de <code>public</code> mediante su Data API. Si solo proteges tu Edge Function
+          pero dejas una tabla abierta, alguien podría intentar saltarse esa función y acceder por la API de datos [3].
+        </p>
+
+        <p>Usaremos dos controles:</p>
+        <ol>
+          <li><strong>Permisos de tabla:</strong> <code>anon</code> y <code>authenticated</code> no tienen permisos
+            sobre <code>invoices</code>.</li>
+          <li><strong>RLS activado, sin políticas públicas:</strong> no concedemos acceso directo a filas desde clientes
+            públicos.</li>
+        </ol>
+        <p>La función usa una clave secreta interna, asociada a <code>service_role</code>, que omite RLS. Por eso cada
+          lectura filtra <code>issuer_id</code> y cada inserción obtiene esa identidad del token, nunca del cuerpo
+          enviado. RLS no separa las tiendas dentro de este cliente administrativo: la autorización de nuestra función
+          lo hace [2][3].</p>
+        <p><strong>Importante:</strong> No compartas claves <code>sb_secret_...</code>, <code>service_role</code>, la
+          contraseña PostgreSQL ni tokens de administración. El compañero recibe solo un token propio de facturación.
+          Ese token permite crear/consultar comprobantes de su tienda, no administrar Supabase.</p>
+      </section>
+
+      <!-- Section 2 -->
+      <section id="seccion-2">
+        <h2>2. Contrato que implementaremos</h2>
+        <p><strong>Dirección base del microservicio:</strong></p>
+        <div class="code-wrapper">
+          <div class="code-header"><span>URL Base</span></div>
+          <pre><code>https://TU_PROJECT_REF.supabase.co/functions/v1/billing</code></pre>
+        </div>
+        <p>A esa base añades <code>/health</code>, <code>/invoices</code> o <code>/invoices/ID</code>. No dupliques
+          <code>/billing</code>. <code>TU_PROJECT_REF</code> se reemplaza por la referencia real del proyecto, no por su
+          nombre visible.</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Método y ruta relativa</th>
+                <th>Autenticación</th>
+                <th>Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>GET /health</code></td>
+                <td>No</td>
+                <td>200: el código responde. No comprueba la BD.</td>
+              </tr>
+              <tr>
+                <td><code>POST /invoices</code></td>
+                <td><code>X-Billing-Token</code></td>
+                <td>201 si crea; 200 si recupera la misma factura.</td>
+              </tr>
+              <tr>
+                <td><code>GET /invoices/{id}</code></td>
+                <td><code>X-Billing-Token</code></td>
+                <td>200 propia; 404 inexistente o de otra tienda.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Solicitud de emisión</h3>
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>HTTP Request POST /invoices</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>POST /invoices
+Content-Type: application/json
+X-Billing-Token: TOKEN_DE_LA_TIENDA
+Idempotency-Key: 11111111-1111-4111-8111-111111111111
+
+{
+  "order_id": "11111111-1111-4111-8111-111111111111",
+  "currency": "PEN",
+  "items": [
+    {"product_id": "p1", "name": "Producto demo", "quantity": 2, "unit_price_cents": 2500}
+  ],
+  "total_cents": 5000
+}</code></pre>
+        </div>
+
+        <p><strong>Reglas exactas del contrato:</strong></p>
+        <ul>
+          <li>Solo esos cuatro campos en el cuerpo y esos cuatro por línea. No envíes <code>issuer_id</code>,
+            <code>status</code>, <code>notification_status</code> ni <code>created_at</code>.</li>
+          <li><code>order_id</code>: UUID en minúsculas, conservando el ID del pedido S09. <code>Idempotency-Key</code>
+            debe ser exactamente ese mismo ID. Es una regla de este servicio, no un estándar universal de HTTP.</li>
+          <li><code>currency</code>: siempre <code>PEN</code>. Los importes son céntimos enteros, no soles ni strings.
+            <code>2500</code> representa S/ 25.00.</li>
+          <li>Entre 1 y 6 líneas; productos distintos. <code>product_id</code>: 1–64 caracteres,
+            letras/dígitos/guion/guion bajo; empieza con letra o dígito. <code>name</code>: texto no vacío, máximo 200
+            caracteres.</li>
+          <li><code>quantity</code>: número entero de 1 a 5. Se rechazan <code>true</code>, <code>"2"</code> y
+            fracciones. JSON no distingue semánticamente 2 de 2.0; ambos se parsean como el mismo número en JavaScript.
+          </li>
+          <li><code>unit_price_cents</code>: entero de 0 a 1 000 000 000. <code>total_cents</code>: entero igual a la
+            suma de <code>quantity × unit_price_cents</code>. El servidor recalcula, no confía en el total recibido.
+          </li>
+          <li>Máximo 32 768 bytes de cuerpo. No se aceptan campos extra.</li>
+          <li>Mismo consumidor + mismo pedido + mismo contenido normalizado: misma factura. Mismo pedido con otro
+            nombre, precio o cantidad válida: 409. Ordenar de otra forma las claves JSON o las líneas no cambia la
+            operación; cambiar el texto sí.</li>
+          <li>Otra tienda puede emitir su propio comprobante para un ID de pedido coincidente. La identidad se deriva de
+            su token.</li>
+        </ul>
+
+        <h3>Respuesta de emisión y consulta</h3>
+        <p>El cuerpo tiene <code>id</code> (UUID de la factura), <code>number</code> (DEMO- seguido del UUID completo),
+          <code>issuer_id</code>, <code>order_id</code>, <code>currency</code>, <code>items</code>,
+          <code>total_cents</code>, <code>status: "issued"</code> y <code>created_at</code> (fecha con zona horaria).
+          Los genera o confirma el servidor; el consumidor no inventa el ID de factura. Las líneas se devuelven
+          ordenadas por <code>product_id</code>.</p>
+        <p>El primer POST devuelve <strong>201</strong> y <code>X-Idempotent-Replay: false</code>; repetir devuelve
+          <strong>200</strong> y <code>X-Idempotent-Replay: true</code>, con el mismo snapshot. Esto no cambia el
+          contrato S09, cuyo POST de pedidos conserva sus propias reglas y códigos.</p>
+
+        <p>Todos los errores de la función siguen esta estructura canónica:</p>
+        <div class="code-wrapper">
+          <pre><code>{"error":{"code":"IDEMPOTENCY_CONFLICT","message":"El pedido ya fue facturado con otro contenido."}}</code></pre>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>HTTP</th>
+                <th>Código</th>
+                <th>Qué debe hacer el consumidor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>400</td>
+                <td><code>BAD_JSON</code></td>
+                <td>Corregir JSON.</td>
+              </tr>
+              <tr>
+                <td>401</td>
+                <td><code>UNAUTHORIZED</code></td>
+                <td>Corregir token; no reintentar en bucle.</td>
+              </tr>
+              <tr>
+                <td>404</td>
+                <td><code>NOT_FOUND</code></td>
+                <td>Revisar ruta, ID y consumidor.</td>
+              </tr>
+              <tr>
+                <td>405</td>
+                <td><code>METHOD_NOT_ALLOWED</code></td>
+                <td>Usar el método indicado.</td>
+              </tr>
+              <tr>
+                <td>409</td>
+                <td><code>IDEMPOTENCY_CONFLICT</code></td>
+                <td>Investigar el snapshot; no generar otro ID para evadirlo.</td>
+              </tr>
+              <tr>
+                <td>413 / 415</td>
+                <td><code>PAYLOAD_TOO_LARGE</code> / <code>UNSUPPORTED_MEDIA_TYPE</code></td>
+                <td>Reducir cuerpo / usar <code>application/json</code>.</td>
+              </tr>
+              <tr>
+                <td>422</td>
+                <td><code>VALIDATION_ERROR</code></td>
+                <td>Corregir campos, total o clave de idempotencia.</td>
+              </tr>
+              <tr>
+                <td>503</td>
+                <td><code>CONFIG_ERROR</code> / <code>DEPENDENCY_UNAVAILABLE</code></td>
+                <td>Revisar configuración o reintentar un fallo transitorio con el mismo pedido y cuerpo.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><em>El gateway puede devolver sus propios errores, por ejemplo 429 por límite o un 5xx. No supongas que todo
+            error de red tendrá nuestro JSON.</em></p>
+      </section>
+
+      <!-- Section 3 -->
+      <section id="seccion-3">
+        <h2>3. Preparar el proyecto</h2>
+        <p><strong>Requisitos:</strong> cuenta y proyecto Supabase propio, Internet, Git, Node.js 20 o superior y Python
+          3. Comandos válidos en PowerShell, Bash o terminal de VS Code (en Windows <code>python</code>; en Linux
+          <code>python3</code>).</p>
+
+        <div class="callout info">
+          <div class="callout-title"><span>💡</span> Sin necesidad de Docker local</div>
+          <p>La ruta principal usa Supabase alojado + despliegue por API: no necesitas Docker ni instalar Deno
+            localmente. No ejecutes <code>supabase start</code> en esta ruta [7][9].</p>
+        </div>
+
+        <ol>
+          <li>Crea un proyecto en Supabase Dashboard solo para esta práctica. Anota el <strong>Project Ref</strong> (en
+            URL y Settings/General). Comprueba que no estás en otro proyecto antes de ejecutar SQL o desplegar.</li>
+          <li>Crea una carpeta fuera del repositorio S09:</li>
+        </ol>
+
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>Terminal (bash/powershell)</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>mkdir billing-service
+cd billing-service
+npm init -y
+npm install --save-dev --save-exact supabase@3.0.0
+npx supabase --version
+npx supabase init
+npx supabase functions new billing</code></pre>
+        </div>
+
+        <p>Se fija CLI 3.0.0 para que los comandos no cambien entre equipos. CLI v3 cambió destinos y confirmaciones de
+          operaciones alojadas; no mezcles comandos de tutoriales v2 [6].</p>
+
+        <p>Crea o edita <code>.gitignore</code> en la raíz del servicio:</p>
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>.gitignore</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>node_modules/
+.env
+.env.*
+*.env
+supabase/.temp/
+supabase/.branches/
+__pycache__/</code></pre>
+        </div>
+        <p><em>No excluyas <code>package-lock.json</code>, el código fuente, SQL ni
+            <code>supabase/config.toml</code>.</em></p>
+      </section>
+
+      <!-- Section 4 -->
+      <section id="seccion-4">
+        <h2>4. Crear la tabla y cerrar el acceso directo</h2>
+        <p>Crea la carpeta <code>sql</code> y el archivo <code>sql/invoices.sql</code>. Luego abre el <strong>SQL
+            Editor</strong> del proyecto en Supabase, pega el bloque y ejecútalo:</p>
+
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>sql/invoices.sql</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>begin;
+create table public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  issuer_id text not null check (issuer_id ~ '^[a-z0-9_-]{1,40}$'),
+  order_id uuid not null,
+  currency text not null check (currency = 'PEN'),
+  items jsonb not null check (jsonb_typeof(items) = 'array' and jsonb_array_length(items) between 1 and 6),
+  total_cents bigint not null check (total_cents between 0 and 30000000000),
+  status text not null default 'issued' check (status = 'issued'),
+  request_hash text not null check (request_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  constraint invoices_issuer_order_unique unique (issuer_id, order_id)
+);
+alter table public.invoices enable row level security;
+revoke all on table public.invoices from PUBLIC, anon, authenticated, service_role;
+grant select, insert on table public.invoices to service_role;
+-- Sin políticas para anon/authenticated: esta tabla no es una API pública.
+commit;</code></pre>
+        </div>
+
+        <p><code>unique (issuer_id, order_id)</code> lo hace cumplir PostgreSQL a nivel motor, incluso con peticiones
+          simultáneas. No basta con «consulto si existe y luego inserto»: dos procesos concurrentes podrían consultar
+          antes de que alguno inserte. <code>request_hash</code> permite verificar si el snapshot reenviado es idéntico.
+          No usamos upsert para no sobrescribir facturas emitidas.</p>
+        <p><code>service_role</code> necesita permisos explícitos además de omitir RLS: por eso el <code>GRANT</code> es
+          explícito. No añadas políticas como <code>USING (true)</code> ni desactives RLS [3].</p>
+      </section>
+
+      <!-- Section 5 -->
+      <section id="seccion-5">
+        <h2>5. Crear credenciales distintas para dos consumidores</h2>
+        <p>Crea <code>crear_secretos.py</code> en la raíz:</p>
+
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>crear_secretos.py</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>import json
+from pathlib import Path
+from secrets import token_hex
+
+files = [Path(n) for n in ("billing.secrets.env", "cliente-propio.env", "cliente-par.env")]
+if any(p.exists() for p in files):
+    raise SystemExit("Ya existen archivos privados: no se sobrescribieron ni rotaron los tokens.")
+clients = {"tienda-a": token_hex(32), "tienda-b": token_hex(32)}
+files[0].write_text("BILLING_CLIENTS='" + json.dumps(clients, separators=(",", ":")) + "'\n", encoding="utf-8")
+for file, issuer in zip(files[1:], clients):
+    file.write_text("BILLING_TOKEN=" + clients[issuer] + "\n", encoding="utf-8")
+for file in files:
+    try:
+        file.chmod(0o600)
+    except OSError:
+        pass
+print("Creados billing.secrets.env, cliente-propio.env y cliente-par.env. No subir a Git.")</code></pre>
+        </div>
+
+        <p>Ejecuta el script:</p>
+        <div class="code-wrapper">
+          <div class="code-header"><span>Terminal</span></div>
+          <pre><code>python crear_secretos.py</code></pre>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Archivo generado</th>
+                <th>Uso</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>billing.secrets.env</code></td>
+                <td>Mapa secreto <code>BILLING_CLIENTS</code>: tienda-a → token A, tienda-b → token B. Se carga
+                  exclusivamente en Supabase.</td>
+              </tr>
+              <tr>
+                <td><code>cliente-propio.env</code></td>
+                <td>Token de <code>tienda-a</code> para configurar tu propio backend S09.</td>
+              </tr>
+              <tr>
+                <td><code>cliente-par.env</code></td>
+                <td>Token de <code>tienda-b</code> que compartirás en privado con tu compañero.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout warning">
+          <div class="callout-title"><span>🔒</span> Manejo estricto de secretos</div>
+          <p>No compartas <code>billing.secrets.env</code>. Entrega a tu compañero <strong>únicamente</strong> el token
+            de <code>cliente-par.env</code> por mensaje privado. Nunca lo publiques en URLs, READMEs, commits ni
+            capturas de pantalla.</p>
+        </div>
+      </section>
+
+      <!-- Section 6 -->
+      <section id="seccion-6">
+        <h2>6. Implementar la Edge Function</h2>
+        <p>Abre <code>supabase/functions/billing/index.ts</code> y sustituye todo su contenido por:</p>
+
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>supabase/functions/billing/index.ts</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>import { createClient } from "npm:@supabase/supabase-js@2.119.0";
+
+type Item = { product_id: string; name: string; quantity: number; unit_price_cents: number };
+type InvoiceInput = { order_id: string; currency: "PEN"; items: Item[]; total_cents: number };
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const columns = "id,issuer_id,order_id,currency,items,total_cents,status,created_at";
+const maxBytes = 32_768;
+
+class ApiError extends Error {
+  constructor(public status: number, public code: string, message: string) { super(message); }
+}
+function fail(status: number, code: string, message: string): never {
+  throw new ApiError(status, code, message);
+}
+function exact(value: unknown, keys: string[]): asserts value is Record&lt;string, unknown&gt; {
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      Object.keys(value).length !== keys.length || !keys.every(k => Object.hasOwn(value, k))) {
+    fail(422, "VALIDATION_ERROR", `Campos requeridos y únicos: ${keys.join(", ")}`);
+  }
+}
+function validate(value: unknown): InvoiceInput {
+  exact(value, ["order_id", "currency", "items", "total_cents"]);
+  if (typeof value.order_id !== "string" || !uuid.test(value.order_id) || value.currency !== "PEN") {
+    fail(422, "VALIDATION_ERROR", "order_id debe ser UUID en minúsculas y currency debe ser PEN.");
+  }
+  if (!Array.isArray(value.items) || value.items.length &lt; 1 || value.items.length &gt; 6) {
+    fail(422, "VALIDATION_ERROR", "items debe contener entre 1 y 6 líneas.");
+  }
+  const seen = new Set&lt;string&gt;();
+  const items: Item[] = value.items.map((item: unknown) => {
+    exact(item, ["product_id", "name", "quantity", "unit_price_cents"]);
+    if (typeof item.product_id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(item.product_id) ||
+        seen.has(item.product_id) || typeof item.name !== "string" ||
+        item.name.length &lt; 1 || item.name.length &gt; 200 || !item.name.trim() ||
+        typeof item.quantity !== "number" || !Number.isSafeInteger(item.quantity) ||
+        item.quantity &lt; 1 || item.quantity &gt; 5 ||
+        typeof item.unit_price_cents !== "number" || !Number.isSafeInteger(item.unit_price_cents) ||
+        item.unit_price_cents &lt; 0 || item.unit_price_cents &gt; 1_000_000_000) {
+      fail(422, "VALIDATION_ERROR", "Línea inválida, producto repetido o entero fuera de rango.");
+    }
+    seen.add(item.product_id);
+    return { product_id: item.product_id, name: item.name,
+      quantity: item.quantity, unit_price_cents: item.unit_price_cents };
+  }).sort((a, b) => a.product_id &lt; b.product_id ? -1 : a.product_id &gt; b.product_id ? 1 : 0);
+  const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price_cents, 0);
+  if (typeof value.total_cents !== "number" || !Number.isSafeInteger(value.total_cents) || value.total_cents !== total) {
+    fail(422, "VALIDATION_ERROR", "total_cents debe ser entero e igual a la suma de las líneas.");
+  }
+  return { order_id: value.order_id, currency: "PEN", items, total_cents: total };
+}
+async function readJson(req: Request): Promise&lt;unknown&gt; {
+  const reader = req.body?.getReader();
+  if (!reader) fail(400, "BAD_JSON", "Falta el cuerpo JSON.");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size &gt; maxBytes) { await reader.cancel(); fail(413, "PAYLOAD_TOO_LARGE", "Máximo 32768 bytes."); }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  try { return JSON.parse(new TextDecoder().decode(bytes)); }
+  catch { fail(400, "BAD_JSON", "JSON mal formado."); }
+}
+function issuerFor(req: Request): string {
+  let clients: unknown;
+  try { clients = JSON.parse(Deno.env.get("BILLING_CLIENTS") ?? "{}"); }
+  catch { fail(503, "CONFIG_ERROR", "Configuración del servicio incompleta."); }
+  if (!clients || typeof clients !== "object" || Array.isArray(clients)) {
+    fail(503, "CONFIG_ERROR", "Configuración del servicio incompleta.");
+  }
+  const entries = Object.entries(clients);
+  if (!entries.length || entries.some(([id, token]) => !/^[a-z0-9_-]{1,40}$/.test(id) ||
+      typeof token !== "string" || !/^[0-9a-f]{64}$/.test(token)) ||
+      new Set(entries.map(([, token]) => token)).size !== entries.length) {
+    fail(503, "CONFIG_ERROR", "Configuración del servicio incompleta.");
+  }
+  const token = req.headers.get("X-Billing-Token") ?? "";
+  const issuer = entries.find(([, expected]) => expected === token)?.[0];
+  if (!issuer) fail(401, "UNAUTHORIZED", "Token ausente o inválido.");
+  return issuer;
+}
+function database() {
+  const url = Deno.env.get("SUPABASE_URL");
+  const keys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
+  const key = keys.default ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) fail(503, "CONFIG_ERROR", "Faltan credenciales internas del servicio.");
+  return createClient(url!, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(5000) }) },
+  });
+}
+function response(body: unknown, status = 200, headers: Record&lt;string, string&gt; = {}) {
+  return Response.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
+}
+function snapshot(row: Record&lt;string, unknown&gt;) {
+  return { ...row, number: `DEMO-${row.id}` };
+}
+
+Deno.serve(async (req: Request) => {
+  try {
+    const path = new URL(req.url).pathname;
+    if (req.method === "GET" && path === "/billing/health") {
+      return response({ status: "ok", service: "billing", version: "1" });
+    }
+    const issuer = issuerFor(req);
+    const match = path.match(/^\/billing\/invoices\/([0-9a-f-]{36})$/);
+    if (req.method === "GET" && match && uuid.test(match[1])) {
+      const { data, error } = await database().from("invoices").select(columns)
+        .eq("issuer_id", issuer).eq("id", match[1]).maybeSingle();
+      if (error) fail(503, "DEPENDENCY_UNAVAILABLE", "No se pudo consultar la factura.");
+      if (!data) fail(404, "NOT_FOUND", "Factura no encontrada.");
+      return response(snapshot(data));
+    }
+    if (path !== "/billing/invoices") fail(404, "NOT_FOUND", "Ruta no encontrada.");
+    if (req.method !== "POST") return response({ error: { code: "METHOD_NOT_ALLOWED", message: "Usa POST." } }, 405, { Allow: "POST" });
+    if ((req.headers.get("Content-Type") ?? "").split(";")[0].trim().toLowerCase() !== "application/json") {
+      fail(415, "UNSUPPORTED_MEDIA_TYPE", "Usa Content-Type: application/json.");
+    }
+    const payload = validate(await readJson(req));
+    if (req.headers.get("Idempotency-Key") !== payload.order_id) {
+      fail(422, "VALIDATION_ERROR", "Idempotency-Key debe ser exactamente order_id.");
+    }
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",
+      new TextEncoder().encode(JSON.stringify(payload))))).map(b => b.toString(16).padStart(2, "0")).join("");
+    const db = database();
+    const { data, error } = await db.from("invoices").insert({
+      ...payload, issuer_id: issuer, request_hash: hash,
+    }).select(columns).single();
+    if (!error) return response(snapshot(data), 201, { "X-Idempotent-Replay": "false" });
+    if (error.code !== "23505") fail(503, "DEPENDENCY_UNAVAILABLE", "No se pudo guardar la factura.");
+    const existing = await db.from("invoices").select(`${columns},request_hash`)
+      .eq("issuer_id", issuer).eq("order_id", payload.order_id).single();
+    if (existing.error) fail(503, "DEPENDENCY_UNAVAILABLE", "Reintenta con la misma clave y cuerpo.");
+    const { request_hash, ...row } = existing.data;
+    if (request_hash !== hash) fail(409, "IDEMPOTENCY_CONFLICT", "El pedido ya fue facturado con otro contenido.");
+    return response(snapshot(row), 200, { "X-Idempotent-Replay": "true" });
+  } catch (error) {
+    if (error instanceof ApiError) return response({ error: { code: error.code, message: error.message } }, error.status);
+    console.error("billing: fallo interno; no se registran tokens ni cuerpos");
+    return response({ error: { code: "DEPENDENCY_UNAVAILABLE", message: "Servicio temporalmente no disponible." } }, 503);
+  }
+});</code></pre>
+        </div>
+
+        <p><strong>Configuración de la función en <code>supabase/config.toml</code>:</strong></p>
+        <div class="code-wrapper">
+          <div class="code-header"><span>supabase/config.toml</span></div>
+          <pre><code>[functions.billing]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/billing/index.ts"</code></pre>
+        </div>
+        <p><strong>¿Por qué <code>verify_jwt = false</code>?</strong> Nuestros consumidores no envían un JWT de Supabase
+          Auth: envían un token propio en <code>X-Billing-Token</code>. La función los autentica internamente en
+          <code>issuerFor()</code>. Desactivar esta comprobación del gateway solo es correcto porque implementamos
+          autenticación personalizada [4].</p>
+      </section>
+
+      <!-- Section 7 -->
+      <section id="seccion-7">
+        <h2>7. Desplegar sin Docker</h2>
+        <p>Desde la raíz de <code>billing-service</code> ejecuta:</p>
+
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>Terminal de despliegue</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>npx supabase login
+npx supabase link --project-ref TU_PROJECT_REF
+npx supabase secrets set --env-file billing.secrets.env --remote=TU_PROJECT_REF
+npx supabase functions deploy billing --use-api --remote=TU_PROJECT_REF</code></pre>
+        </div>
+
+        <p>Reemplaza <code>TU_PROJECT_REF</code> en cada comando. <code>--use-api</code> realiza el empaquetado y build
+          en los servidores de Supabase, evitando instalar Docker o Deno en tu máquina. Verifica en <strong>Edge
+            Functions → billing</strong> del Dashboard que el servicio está activo.</p>
+      </section>
+
+      <!-- Section 8 -->
+      <section id="seccion-8">
+        <h2>8. Probar el servicio antes de tocar S09</h2>
+
+        <h3>8.1 Primera emisión manual</h3>
+        <ol>
+          <li><code>GET BASE/health</code>: Espera 200 con
+            <code>{"status":"ok","service":"billing","version":"1"}</code>.</li>
+          <li><code>POST BASE/invoices</code> con el JSON de la sección 2 y tu token de <code>cliente-propio.env</code>
+            (sin <code>BILLING_TOKEN=</code>). Espera 201 y guarda el <code>id</code>.</li>
+          <li>Repite exactamente el mismo POST: espera 200, <code>X-Idempotent-Replay: true</code> y el mismo
+            comprobante.</li>
+          <li><code>GET BASE/invoices/ID_RECIBIDO</code>: comprueba la lectura.</li>
+          <li>Verifica la fila en el <strong>Table Editor</strong> de Supabase.</li>
+        </ol>
+
+        <h3>8.2 Comprobador HTTP reproducible</h3>
+        <p>Crea <code>probar_billing.py</code> en la raíz:</p>
+
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>probar_billing.py</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>"""Prueba el contrato por HTTP; no necesita librerías ni claves de Supabase."""
+import copy
+import getpass
+import json
+import os
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+base = (os.getenv("BILLING_BASE_URL") or input("URL base terminada en /functions/v1/billing: ")).rstrip("/")
+token_a = os.getenv("BILLING_TOKEN") or getpass.getpass("Token de tienda-a: ")
+token_b = os.getenv("BILLING_PEER_TOKEN") or getpass.getpass("Token de tienda-b: ")
+assert base.startswith("https://") or base.startswith("http://127.0.0.1:"), "Usa HTTPS; HTTP solo para prueba local."
+assert token_a != token_b, "Usa dos tokens distintos."
+passed = []
+
+def call(method, path, body=None, token=token_a, key=None, raw=None, content_type="application/json"):
+    headers = {"Content-Type": content_type}
+    if token:
+        headers["X-Billing-Token"] = token
+    if key is not None:
+        headers["Idempotency-Key"] = key
+    data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
+    req = Request(base + path, data=data, headers=headers, method=method)
+    try:
+        result = urlopen(req, timeout=20)
+    except HTTPError as error:
+        result = error
+    with result:
+        return result.status, json.loads(result.read())
+
+def check(label, condition):
+    assert condition, "FALLÓ: " + label
+    passed.append(label)
+    print("PASA:", label)
+
+order = {"order_id": str(uuid.uuid4()), "currency": "PEN", "items": [
+    {"product_id": "p2", "name": "Cable demo", "quantity": 1, "unit_price_cents": 1000},
+    {"product_id": "p1", "name": "Producto demo", "quantity": 2, "unit_price_cents": 2500}], "total_cents": 6000}
+key = order["order_id"]
+check("health (no prueba la BD)", call("GET", "/health", token="")[0] == 200)
+check("sin token", call("POST", "/invoices", order, token="", key=key)[0] == 401)
+status, invoice = call("POST", "/invoices", order, key=key)
+check("crear factura persistida", status == 201 and invoice["total_cents"] == 6000 and invoice["issuer_id"] == "tienda-a")
+status, repeated = call("POST", "/invoices", order, key=key)
+check("reintento sin duplicar ni cambiar snapshot", status == 200 and repeated == invoice)
+status, read = call("GET", "/invoices/" + invoice["id"])
+check("consulta persistida", status == 200 and read == invoice)
+changed = copy.deepcopy(order)
+changed["items"][0]["name"] = "Otro nombre"
+status, error = call("POST", "/invoices", changed, key=key)
+check("conflicto con cuerpo diferente", status == 409 and error["error"]["code"] == "IDEMPOTENCY_CONFLICT")
+for label, change in [
+    ("rechaza booleano como cantidad", lambda x: x["items"][0].update(quantity=True)),
+    ("rechaza string como cantidad", lambda x: x["items"][0].update(quantity="1")),
+    ("rechaza total alterado", lambda x: x.update(total_cents=1)),
+    ("rechaza issuer enviado en cuerpo", lambda x: x.update(issuer_id="tienda-b")),
+]:
+    invalid = copy.deepcopy(order)
+    change(invalid)
+    check(label, call("POST", "/invoices", invalid, key=key)[0] == 422)
+check("exige clave igual al order_id", call("POST", "/invoices", order, key="otra-clave")[0] == 422)
+check("no revela factura de otra tienda", call("GET", "/invoices/" + invoice["id"], token=token_b)[0] == 404)
+status, peer = call("POST", "/invoices", order, token=token_b, key=key)
+check("aísla mismo order_id entre tiendas", status == 201 and peer["id"] != invoice["id"] and peer["issuer_id"] == "tienda-b")
+reordered = copy.deepcopy(order)
+reordered["items"].reverse()
+check("orden de líneas no cambia operación", call("POST", "/invoices", reordered, key=key) == (200, invoice))
+concurrent = copy.deepcopy(order)
+concurrent["order_id"] = str(uuid.uuid4())
+with ThreadPoolExecutor(max_workers=5) as pool:
+    results = list(pool.map(lambda _: call("POST", "/invoices", concurrent, key=concurrent["order_id"]), range(5)))
+check("5 llamadas simultáneas producen una sola factura", sorted(s for s, _ in results) == [200, 200, 200, 200, 201] and len({r["id"] for _, r in results}) == 1)
+check("JSON mal formado", call("POST", "/invoices", raw=b"{", key=key)[0] == 400)
+check("Content-Type incorrecto", call("POST", "/invoices", order, key=key, content_type="text/plain")[0] == 415)
+check("limita tamaño del cuerpo", call("POST", "/invoices", raw=b" " * 32769, key=key)[0] == 413)
+print(f"\n{len(passed)}/{len(passed)} pruebas superadas. Estas pruebas crean 3 facturas sintéticas por ejecución.")</code></pre>
+        </div>
+
+        <p>Ejecuta: <code>python probar_billing.py</code> e ingresa la URL y los dos tokens.</p>
+
+        <h3>8.3 Comprobar permisos y RLS</h3>
+        <p>Ejecuta en el <strong>SQL Editor</strong> de Supabase:</p>
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>Verificación SQL</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>select relrowsecurity as rls_activo,
+  (select count(*) from pg_policies
+   where schemaname = 'public' and tablename = 'invoices') as numero_politicas
+from pg_class
+where oid = 'public.invoices'::regclass;
+
+select rol,
+  has_table_privilege(rol, 'public.invoices', 'SELECT') as puede_leer,
+  has_table_privilege(rol, 'public.invoices', 'INSERT') as puede_insertar,
+  has_table_privilege(rol, 'public.invoices', 'UPDATE') as puede_actualizar,
+  has_table_privilege(rol, 'public.invoices', 'DELETE') as puede_borrar
+from (values ('anon'), ('authenticated'), ('service_role')) as roles(rol);</code></pre>
+        </div>
+        <p><strong>Resultado esperado:</strong> <code>rls_activo = true</code>, <code>numero_politicas = 0</code>. Para
+          <code>anon</code> y <code>authenticated</code>, todas las columnas deben ser <code>false</code>. Para
+          <code>service_role</code>, solo lectura e inserción deben ser <code>true</code>.</p>
+      </section>
+
+      <!-- Section 9 -->
+      <section id="seccion-9">
+        <h2>9. Integración que implementarás en tu aplicativo S09</h2>
+        <p>Construye un adaptador en el backend/worker de S09, <strong>nunca en el JavaScript del
+            cliente/navegador</strong>.</p>
+
+        <h3>9.1 Transformación exacta del contrato S09</h3>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Campo Facturación</th>
+                <th>De dónde sale en S09</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>order_id</code></td>
+                <td><code>order.id</code> del pedido confirmado/persistido (no la clave original del checkout).</td>
+              </tr>
+              <tr>
+                <td><code>currency</code></td>
+                <td><code>"PEN"</code>, moneda fija de la campaña S09.</td>
+              </tr>
+              <tr>
+                <td><code>items[].product_id</code></td>
+                <td><code>order.items[].product_id</code></td>
+              </tr>
+              <tr>
+                <td><code>items[].name</code></td>
+                <td><code>order.items[].name</code></td>
+              </tr>
+              <tr>
+                <td><code>items[].quantity</code></td>
+                <td><code>order.items[].quantity</code></td>
+              </tr>
+              <tr>
+                <td><code>items[].unit_price_cents</code></td>
+                <td><code>order.items[].unit_price_cents</code></td>
+              </tr>
+              <tr>
+                <td><code>total_cents</code></td>
+                <td><code>order.total_cents</code> (debe coincidir con la suma exacta).</td>
+              </tr>
+              <tr>
+                <td><code>Idempotency-Key</code> (Header)</td>
+                <td>Exactamente <code>order.id</code>.</td>
+              </tr>
+              <tr>
+                <td><code>X-Billing-Token</code> (Header)</td>
+                <td>Configuración privada del backend S09.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>9.2 Configuración, flujo y errores</h3>
+        <p>Variables a configurar en el entorno de S09 (ignoradas por Git):</p>
+        <div class="code-wrapper">
+          <pre><code>BILLING_BASE_URL=https://TU_PROJECT_REF.supabase.co/functions/v1/billing
+BILLING_TOKEN=TOKEN_ASIGNADO_A_ESTA_TIENDA</code></pre>
+        </div>
+
+        <p>En Docker Compose, pásalas en el bloque <code>environment</code> compartido por <code>api</code> y
+          <code>worker</code>:</p>
+        <div class="code-wrapper">
+          <pre><code>    BILLING_BASE_URL: ${BILLING_BASE_URL:-}
+    BILLING_TOKEN: ${BILLING_TOKEN:-}</code></pre>
+        </div>
+
+        <p>Aplica cambios recreando los contenedores:</p>
+        <div class="code-wrapper">
+          <pre><code>docker compose up -d --force-recreate api worker</code></pre>
+        </div>
+
+        <p><strong>Flujo esperado del ciclo de vida:</strong></p>
+        <ol>
+          <li>Pedido confirmado y persistido en S09.</li>
+          <li>Tarea de facturación con snapshot inmutable.</li>
+          <li>POST HTTPS al microservicio de facturación.</li>
+          <li>Guardar relación <code>pedido ↔ factura</code> o estado de fallo <code>pending</code>.</li>
+          <li>Mostrar al usuario comprobante / facturación pendiente.</li>
+        </ol>
+
+        <div class="callout warning">
+          <div class="callout-title"><span>🛡️</span> Principios de desacoplamiento</div>
+          <ul>
+            <li>No metas la llamada remota dentro de una transacción de stock ni vuelvas a crear el pedido para
+              facturarlo.</li>
+            <li>El fallo de facturación no revierte una venta confirmada.</li>
+            <li>No elimines el consumidor de notificaciones ya existente para reemplazarlo por facturación.</li>
+            <li>Añade tu propio estado local de facturación (ej: <code>pending</code> → <code>issued</code> /
+              <code>failed</code>). No lo confundas con <code>notification_status</code>.</li>
+            <li>Usa timeout finito (ej. 15 segundos).</li>
+          </ul>
+        </div>
+
+        <h3>9.3 Resiliencia básica que debe verse funcionando</h3>
+        <p>Implementa <strong>timeout + idempotencia + recuperación mediante reintento manual</strong>. Un timeout puede
+          ocurrir tras guardar en Supabase; el reintento recupera la misma factura sin duplicarla.</p>
+
+        <h3>9.4 Prompt útil para implementar el adaptador con IA</h3>
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>Prompt de asistencia</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>Lee el contrato S09 y la sección 9 de esta guía. Implementa en mi backend/worker
+un adaptador HTTP de facturación, sin reemplazar mis correcciones previas.
+Usa el snapshot persistido del pedido confirmado, nunca precios del navegador.
+Envía el contrato exacto a BILLING_BASE_URL/invoices, con X-Billing-Token privado
+ e Idempotency-Key igual al ID del pedido. Acepta 201/200 y valida el order_id
+respondido. Conserva el pedido si facturación falla; agrega estado/reintento
+sin alterar notification_status ni el JSON público de S09. Usa timeout finito
+y recuperación mediante reintento manual con el mismo cuerpo y clave. Si agregas
+reintentos automáticos, limítalos a dos por ejecución para fallos transitorios.
+No desactives controles para pasar pruebas. Primero
+identifica dónde se confirma/persiste el pedido y qué cola/worker existe;
+después implementa y prueba éxito, replay, conflicto y caída del proveedor.
+No necesitas credenciales administrativas de Supabase ni modificar su BD.</code></pre>
+        </div>
+      </section>
+
+      <!-- Section 10 -->
+      <section id="seccion-10">
+        <h2>10. Validación entre dos compañeros</h2>
+        <ol>
+          <li><strong>A</strong> comprueba su propio servicio con el script y su S09 local.</li>
+          <li><strong>A</strong> comparte con <strong>B</strong> la URL HTTPS base y únicamente el token de
+            <code>tienda-b</code> (de <code>cliente-par.env</code>). No comparte claves de BD ni token propio.</li>
+          <li>En su S09 local, <strong>B</strong> configura el servicio de <strong>A</strong> con ese token.
+            <strong>B</strong> confirma un pedido propio, emite comprobante y lo consulta.</li>
+          <li><strong>B</strong> repite la solicitud para el mismo pedido: debe devolver el mismo comprobante (200), no
+            crear otra fila.</li>
+          <li><strong>A</strong> intenta consultar con su token A el comprobante generado por <strong>B</strong>: debe
+            recibir un <strong>404</strong> (aislamiento multitenant).</li>
+          <li><strong>Invertir roles:</strong> ahora <strong>B</strong> provee y <strong>A</strong> consume.</li>
+        </ol>
+      </section>
+
+      <!-- Section 11 -->
+      <section id="seccion-11">
+        <h2>11. Guardar y entregar</h2>
+        <p>Crea un repositorio vacío en GitHub para <code>billing-service</code>:</p>
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span>Comandos Git</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copiar</button>
+          </div>
+          <pre><code>git init
+git add .
+git status --short
+git diff --cached --name-only
+git commit -m "Implementa microservicio de facturacion de demostracion"
+git branch -M main
+git remote add origin URL_REAL_DEL_REPOSITORIO_VACIO
+git push -u origin main</code></pre>
+        </div>
+
+        <h3>Lista de verificación de entrega</h3>
+        <ul class="checklist">
+          <li><span class="checklist-icon">✔</span> POST real crea una fila y GET la recupera por ID.</li>
+          <li><span class="checklist-icon">✔</span> Replay y concurrencia no duplican; contenido diferente produce 409.
+          </li>
+          <li><span class="checklist-icon">✔</span> Tokens diferentes aíslan datos; acceso directo público a la tabla
+            está denegado.</li>
+          <li><span class="checklist-icon">✔</span> S09 conserva su comportamiento y consume desde backend/worker con
+            snapshot persistido.</li>
+          <li><span class="checklist-icon">✔</span> Caída del proveedor deja el pedido confirmado y la facturación
+            recuperable.</li>
+          <li><span class="checklist-icon">✔</span> Cada PC consume el servicio del compañero desde su propio S09.</li>
+          <li><span class="checklist-icon">✔</span> Ambos repositorios están publicados sin secretos; la evidencia
+            muestra códigos e IDs, no credenciales.</li>
+        </ul>
+      </section>
+
+      <!-- Section 12 -->
+      <section id="seccion-12">
+        <h2>12. Errores frecuentes</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Síntoma</th>
+                <th>Revisión concreta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>401 antes de ejecutar el handler</td>
+                <td>Revisa <code>verify_jwt = false</code> en <code>supabase/config.toml</code>, despliega otra vez y
+                  confirma el proyecto.</td>
+              </tr>
+              <tr>
+                <td>Nuestro UNAUTHORIZED (401)</td>
+                <td>Se ejecutó el código: revisa cabecera <code>X-Billing-Token</code>, token sin espacios/prefijo y
+                  mapa cargado en ese mismo proveedor.</td>
+              </tr>
+              <tr>
+                <td>503 CONFIG_ERROR</td>
+                <td><code>BILLING_CLIENTS</code> vacío/JSON incorrecto, tokens repetidos o que no tienen 64 caracteres
+                  hex, o faltan credenciales internas.</td>
+              </tr>
+              <tr>
+                <td>503 DEPENDENCY_UNAVAILABLE</td>
+                <td>Revisa tabla, permisos, proyecto, disponibilidad y logs de la función. No publiques tokens ni el
+                  cuerpo completo al depurar.</td>
+              </tr>
+              <tr>
+                <td>404 NOT_FOUND</td>
+                <td>Base incorrecta, <code>/billing</code> duplicado en la ruta, ID de pedido usado como ID de factura,
+                  o token de otra tienda.</td>
+              </tr>
+              <tr>
+                <td>422 VALIDATION_ERROR</td>
+                <td>Cuerpo del checkout en lugar de snapshot persistido, campos extra, total incorrecto o
+                  <code>Idempotency-Key</code> distinto al UUID del pedido.</td>
+              </tr>
+              <tr>
+                <td>Error CORS desde el navegador</td>
+                <td>Llamada realizada desde el cliente. La integración es backend → backend; no agregues <code>*</code>
+                  ni expongas el token en frontend.</td>
+              </tr>
+              <tr>
+                <td>CLI intenta cambiar destino erróneo</td>
+                <td>Esta guía usa CLI 3.0.0 y <code>--remote=REF</code>. Revisa versión y destino; no ejecutes comandos
+                  v2.</td>
+              </tr>
+              <tr>
+                <td><code>/health</code> responde pero facturar falla</td>
+                <td>La salud de proceso no comprueba PostgreSQL: ejecuta POST, GET y verifica fila en base de datos.
+                </td>
+              </tr>
+              <tr>
+                <td>S09 indica que falta configurar facturación</td>
+                <td>Revisa <code>BILLING_TOKEN</code> dentro del contenedor en ejecución. Añádelo a environment y recrea
+                  <code>api</code> y <code>worker</code> con <code>--force-recreate</code>.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- References & Scope -->
+      <footer id="referencias" class="footer">
+        <p style="margin-top: 0.5rem;"><strong>Fuentes y documentación oficial:</strong></p>
+        <ul style="margin-top: 0.4rem; list-style-type: square;">
+          <li>[1] Edge Functions: <a href="https://supabase.com/docs/guides/functions" target="_blank"
+              rel="noreferrer">supabase.com/docs/guides/functions</a></li>
+          <li>[2] API Keys: <a href="https://supabase.com/docs/guides/getting-started/api-keys" target="_blank"
+              rel="noreferrer">supabase.com/docs/guides/getting-started/api-keys</a></li>
+          <li>[3] Row Level Security: <a href="https://supabase.com/docs/guides/database/postgres/row-level-security"
+              target="_blank" rel="noreferrer">supabase.com/docs/guides/database/postgres/row-level-security</a></li>
+          <li>[4] Auth Headers: <a href="https://supabase.com/docs/guides/functions/auth-headers" target="_blank"
+              rel="noreferrer">supabase.com/docs/guides/functions/auth-headers</a></li>
+          <li>[5] Function Secrets: <a href="https://supabase.com/docs/guides/functions/secrets" target="_blank"
+              rel="noreferrer">supabase.com/docs/guides/functions/secrets</a></li>
+          <li>[6] Supabase CLI v3: <a href="https://supabase.com/changelog/supabase-cli-v3" target="_blank"
+              rel="noreferrer">supabase.com/changelog/supabase-cli-v3</a></li>
+          <li>[7] Functions Deploy: <a href="https://supabase.com/docs/guides/functions/deploy" target="_blank"
+              rel="noreferrer">supabase.com/docs/guides/functions/deploy</a></li>
+          <li>[8] Quickstart Dashboard: <a href="https://supabase.com/docs/guides/functions/quickstart-dashboard"
+              target="_blank" rel="noreferrer">supabase.com/docs/guides/functions/quickstart-dashboard</a></li>
+          <li>[9] Local Development: <a href="https://supabase.com/docs/guides/local-development/cli/getting-started"
+              target="_blank" rel="noreferrer">supabase.com/docs/guides/local-development/cli/getting-started</a></li>
+          <li>[10] Database per Service: <a href="https://microservices.io/patterns/data/database-per-service.html"
+              target="_blank" rel="noreferrer">microservices.io/patterns/data/database-per-service.html</a></li>
+          <li>[11] Docker Compose Restart: <a href="https://docs.docker.com/reference/cli/docker/compose/restart"
+              target="_blank" rel="noreferrer">docs.docker.com/reference/cli/docker/compose/restart</a></li>
+          <li>[12] PostgreSQL Table Grants: <a
+              href="https://www.postgresql.org/docs/current/infoschema-role-table-grants.html" target="_blank"
+              rel="noreferrer">postgresql.org/docs/current/infoschema-role-table-grants.html</a></li>
+        </ul>
+      </footer>
+
+    </main>
+  </div>
+
+  <script>
+    function copyCode(button) {
+      const pre = button.closest('.code-wrapper').querySelector('pre');
+      const text = pre.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = button.innerText;
+        button.innerText = '¡Copiado!';
+        button.style.borderColor = 'var(--accent)';
+        button.style.color = 'var(--accent)';
+        setTimeout(() => {
+          button.innerText = orig;
+          button.style.borderColor = '';
+          button.style.color = '';
+        }, 2000);
+      });
+    }
+  </script>
+
+</body>
+
+</html>

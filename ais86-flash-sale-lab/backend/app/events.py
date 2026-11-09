@@ -17,7 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .config import Settings
 from .db import PUBLIC_DATASET, utcnow
-from .models import EventRecord, Notification, Order, OrderItem, Outbox, Product, Run
+from .models import BillingRecord, EventRecord, Notification, Order, OrderItem, Outbox, Product, Run
+from .billing import issue_invoice
 
 logger = logging.getLogger(__name__)
 
@@ -397,6 +398,11 @@ async def handle_stream_message(
         logger.warning("event processing failed type=%s", type(exc).__name__)
         return False
 
+    try:
+        await issue_invoice(session_factory, order_id, settings)
+    except Exception as exc:
+        logger.warning("billing persistence failed type=%s", type(exc).__name__)
+
     await client.xack(settings.stream_name, settings.consumer_group, message_id)
     return True
 
@@ -409,6 +415,7 @@ async def delete_dataset_rows(session: AsyncSession, dataset_ids: list[str]) -> 
         await _lock_dataset(session, dataset_id)
     order_ids = select(Order.id).where(Order.dataset_id.in_(safe_ids))
     await session.execute(delete(Notification).where(Notification.dataset_id.in_(safe_ids)))
+    await session.execute(delete(BillingRecord).where(BillingRecord.dataset_id.in_(safe_ids)))
     await session.execute(delete(EventRecord).where(EventRecord.dataset_id.in_(safe_ids)))
     await session.execute(delete(Outbox).where(Outbox.dataset_id.in_(safe_ids)))
     await session.execute(delete(OrderItem).where(OrderItem.order_id.in_(order_ids)))
